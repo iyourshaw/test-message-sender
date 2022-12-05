@@ -32,7 +32,7 @@
         /* See https://www.thymeleaf.org/doc/tutorials/3.0/usingthymeleaf.html#javascript-inlining */
         var mapboxUrl = '[(${mapboxTileEndpoint})]';
         console.log(mapboxUrl);
-        var mapboxAttrib = '&copy; Open Street Map | Mapbox';
+        var mapboxAttrib = 'Mapbox';
         var osm = L.tileLayer(osmUrl, {maxZoom: 19, attribution: osmAttrib});
         var goog = L.tileLayer(googUrl, {maxZoom: 22, attribution: googAttrib});
         var mapbox = L.tileLayer(mapboxUrl, {
