@@ -1,0 +1,177 @@
+<!DOCTYPE HTML>
+<html  xmlns:th="http://www.thymeleaf.org">
+    <head>
+
+        <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet.draw/0.4.14/leaflet.draw.css"/>
+        <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.3/dist/leaflet.css"
+            integrity="sha256-kLaT2GOSpHechhsozzB+flnD+zUyjE2LlfWPgU04xyI="
+            crossorigin=""/>
+        <link th:href="@{/style.css}" rel="stylesheet"/>
+        <script src="https://unpkg.com/leaflet@1.9.3/dist/leaflet.js"
+            integrity="sha256-WBkoXOwTeyKclOHuWtc+i2uENFpDZ9YPdf5Hf+D7ewM="
+            crossorigin=""></script>
+        <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet.draw/0.4.14/leaflet.draw.js"></script>
+        
+        
+    </head>
+    <body>
+        <div id="map">
+            <button type="button" style="position: relative; padding: 10px; left: 100px; top: 10px; z-index: 9999"
+            onclick="sendBsms();">Send BSMs</button>
+        </div>
+        
+    </body>
+    <script >
+        var map = L.map('map').setView([39.5952649, -105.0914122], 19);
+        
+        /* Base Maps */
+        var osmUrl = 'https://tile.openstreetmap.org/{z}/{x}/{y}.png';
+        var osmAttrib = '&copy; <a href="http://www.openstreetmap.org/copyright">OpenStreetMap</a>';
+        var googUrl = 'https://mt1.google.com/vt/lyrs=y&x={x}&y={y}&z={z}';
+        var googAttrib = 'Google Maps';
+        /* See https://www.thymeleaf.org/doc/tutorials/3.0/usingthymeleaf.html#javascript-inlining */
+        var mapboxUrl = '[(${mapboxTileEndpoint})]';
+        console.log(mapboxUrl);
+        var mapboxAttrib = '&copy; Open Street Map | Mapbox';
+        var osm = L.tileLayer(osmUrl, {maxZoom: 19, attribution: osmAttrib});
+        var goog = L.tileLayer(googUrl, {maxZoom: 22, attribution: googAttrib});
+        var mapbox = L.tileLayer(mapboxUrl, {
+            maxZoom: 22,
+            attribution: mapboxAttrib
+        });
+        var drawnItems = new L.FeatureGroup();
+        
+        var bsmList = [];  /* Array of timestamps/ BSM locations */
+
+        var layerControl = L.control.layers({
+            'Open Street Map': osm.addTo(map),
+            'Google Hybrid': goog.addTo(map),
+            'Mapbox Satellite Streets': mapbox.addTo(map)
+        }, { 'Draw BSM Layer': drawnItems }, {positiion: 'topright', collapsed: false}).addTo(map);
+
+
+        /* Shape draw controls */
+        
+        map.addLayer(drawnItems);
+
+        
+
+        var drawControl = new L.Control.Draw({
+            position: 'topleft',
+            draw: {
+                polyline: false,
+                polygon: false,
+                rectangle: false,
+                circle: false,
+                marker: false,
+                circlemarker: {
+                    color: '#f00',
+                    fillOpacity: 0.9,
+                    stroke: false,
+                    radius: 5
+                }
+            },
+            edit: {
+                featureGroup: drawnItems,
+                remove: true
+            }
+        });
+        map.addControl(drawControl);
+       
+
+        map.on(L.Draw.Event.CREATED, function(e) {
+            var type = e.layerType, 
+                layer = e.layer;
+            if (type == 'circlemarker') {
+                
+                drawnItems.addLayer(layer);
+                console.log('Placed point');
+                console.log(layer);
+
+                var lon = layer._latlng.lng;
+                var lat = layer._latlng.lat;
+
+                /* Save the coordinates with the current timestamp */
+                var ts = Date.now();
+                var bsm = {timestamp: ts, coords: [lon, lat]};
+                
+                /* Tag the layer with the bsm timestamp so we can find it to update or delete */
+                layer.bsmTimestamp = ts;
+
+                bsmList.push(bsm);
+                console.log(bsmList);
+
+                /* Keep circlemarker button in edit mode
+                   TODO Figure out some way to do this other than this hack */
+                throw 'Throwing exception to keep the circlemarker in edit mode.  Not ideal but it works.'
+
+            } else {
+                console.log('layerType ' + type + ' not used');
+            }
+        });
+
+        map.on('draw:edited', function(e) {
+            /* TODO update bsmList */
+            console.log(e);
+
+        });
+
+        map.on('draw:deleted', function(e) {
+            console.log(e);
+            /* Remove all items */
+            bsmList.length = 0;
+            /* TODO: Don't assume all items were deleted */
+        });
+
+        async function getMapGeojson() {
+            const response = await fetch('map_wadsworth_and_coalmine.geojson');
+            const mapGeojson = await response.json();
+            console.log("MAP Geojson:");
+            console.log(mapGeojson);
+            const geojsonLayer = L.geoJSON(mapGeojson, {
+                style: {
+                    color: '#f0f',
+                    width: '1px',
+                    opacity: 0.7
+                }
+            }).addTo(map);
+            layerControl.addOverlay(geojsonLayer, 'MAP Geojson');
+        }
+
+        
+        getMapGeojson();
+
+        function sendBsms() {
+            var result = sendBsmsAsync().then(successCallback, failureCallback);
+            console.log("Sent BSMs with response");
+            console.log(result);
+        }
+
+        async function sendBsmsAsync() {
+            console.log(bsmList);
+            const response = await fetch('/createBsmMessages', {
+                method: 'POST',
+                cache: 'no-cache',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify(bsmList)
+            });
+            return response;
+        }
+
+        function successCallback(e) {
+            console.log("success");
+            console.log(e);
+        }
+
+        function failureCallback(e) {
+            console.log("failure");
+            console.log(e);
+        }
+
+        
+        
+
+    </script>
+</html>
