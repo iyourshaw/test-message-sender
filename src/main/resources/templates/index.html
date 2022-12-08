@@ -159,18 +159,54 @@
     });
 
     async function getMapGeojson() {
-        const response = await fetch('map_wadsworth_and_coalmine.geojson');
-        const mapGeojson = await response.json();
+        //const response = await fetch('map_wadsworth_and_coalmine.geojson');
+        const response = await fetch('processed_map_v4.json');
+        const mapJson = await response.json();
+        setMapGeojson(mapJson.mapFeatureCollection);
+        setConnectingLanesGeojson(mapJson.connectingLanesFeatureCollection);
+        // console.log("MAP Geojson:");
+        // console.log(mapGeojson);
+        // const geojsonLayer = L.geoJSON(mapGeojson, {
+        //     style: {
+        //         color: '#f0f',
+        //         width: '1px',
+        //         opacity: 0.7
+        //     }
+        // }).addTo(map);
+        // layerControl.addOverlay(geojsonLayer, 'MAP Geojson');
+    }
+
+    let geojsonLayer = undefined;
+    let connectingLayer = undefined;
+
+    function setMapGeojson(mapGeojson) {
         console.log("MAP Geojson:");
         console.log(mapGeojson);
-        const geojsonLayer = L.geoJSON(mapGeojson, {
+        if (geojsonLayer) {
+            layerControl.removeOverlay(geojsonLayer);
+        }
+        geojsonLayer = L.geoJSON(mapGeojson, {
             style: {
                 color: '#f0f',
                 width: '1px',
-                opacity: 0.7
+                opacity: 1
             }
         }).addTo(map);
         layerControl.addOverlay(geojsonLayer, 'MAP Geojson');
+    }
+
+    function setConnectingLanesGeojson(connectingGeojson) {
+        if (connectingLayer) {
+            layerControl.removeOverlay(connectingLayer);
+        }
+        connectingLayer = L.geoJSON(connectingGeojson, {
+            style: {
+                color: '#0f0',
+                width: '1px',
+                opacity: 1
+            }
+        }).addTo(map);
+        layerControl.addOverlay(connectingLayer, "Connections");
     }
 
 
@@ -242,7 +278,14 @@
     function uploadMapGeojson(e) {
         console.log("uploadMapGeojson");
         if (e?.files.length > 0) {
-            console.log(e.files[0]);
+            let file = e.files[0];
+            let objUrl = window.URL.createObjectURL(file);
+            file.text().then(text => {
+                var json = JSON.parse(text);
+                console.log(json);
+                setMapGeojson(json.mapFeatureCollection);
+                setConnectingLanesGeojson(json.connectingLanesFeatureCollection);
+            });
         }
     }
 
