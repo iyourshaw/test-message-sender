@@ -111,11 +111,14 @@ public class TestController {
     }
 
     @PostMapping(value = "/createBsmMessages", consumes = "application/json", produces = "*/*")
-    public @ResponseBody ResponseEntity<String> createBsms(@RequestBody TimestampedCoordinateList bsmCoords) {
+    public @ResponseBody ResponseEntity<String> createBsms(@RequestBody BsmPostData bsmPostData) {
         final String ODE_JSON_TOPIC = "topic.OdeBsmJson";
+        logger.info("Received BSMs: {}", bsmPostData);
         var results = new ArrayList<CompletableFuture<SendResult<String, String>>>();
         try {
-            var bsmDataList = createBsmList(bsmCoords);
+            var bsmCoords = bsmPostData.bsmList;
+            var bsmTemplate = bsmPostData.bsmTemplate;
+            var bsmDataList = createBsmList(bsmCoords, bsmTemplate);
             
             for (var bsmData : bsmDataList) {
                 var result = template.send(ODE_JSON_TOPIC, bsmData.toJson(false));
@@ -127,6 +130,7 @@ public class TestController {
             // Don't do this if this method needs to be fast
             for (CompletableFuture<SendResult<String, String>> result : results) {
                 SendResult<String, String> sendResult = result.join();
+                logger.info("Sent: {}", sendResult);
                 strResults.append(String.format("%s%n", sendResult.toString()));
             }
             
@@ -137,25 +141,31 @@ public class TestController {
         }
     }
 
-    public List<OdeBsmData> createBsmList(TimestampedCoordinateList bsmCoords) {
+    public List<OdeBsmData> createBsmList(TimestampedCoordinateList bsmCoords, OdeBsmData bsmTemplate) {
         var bsmDataList = new ArrayList<OdeBsmData>();
         int msgCount = 0;
         for (TimestampedCoordinate tsCoord : bsmCoords) {
-            bsmDataList.add(createBsm(tsCoord, msgCount));
+            bsmDataList.add(createBsm(tsCoord, msgCount, bsmTemplate));
             msgCount = (msgCount + 1) % 128;
         }
         return bsmDataList;
     }
 
-    public OdeBsmData createBsm(TimestampedCoordinate bsmCoord, int msgCnt) {
+    public OdeBsmData createBsm(TimestampedCoordinate bsmCoord, int msgCnt, OdeBsmData bsmTemplate) {
         var metadata = new OdeBsmMetadata();
-        try {
-            metadata.setOriginIp(InetAddress.getLocalHost().getAddress().toString());
-        } catch (UnknownHostException e) {
-            logger.error("Error getting local IP address", e);
+        if (bsmTemplate != null) {
+            metadata = (OdeBsmMetadata)bsmTemplate.getMetadata();
+        } else {
+            metadata.setOriginIp("127.0.0.1");
         }
         
+        
+        
         var coreData = new J2735BsmCoreData();
+        if (bsmTemplate != null) {
+            var templatePayload = (OdeBsmPayload)bsmTemplate.getPayload();
+            coreData = templatePayload.getBsm().getCoreData();
+        }
         coreData.setMsgCnt(msgCnt);
         
         var instant = Instant.ofEpochMilli(bsmCoord.getTimestamp());
