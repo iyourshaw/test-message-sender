@@ -34,6 +34,8 @@ import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.servlet.ModelAndView;
 
 import com.fasterxml.jackson.annotation.JsonInclude.Include;
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.JsonMappingException;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
@@ -54,12 +56,8 @@ public class TestController {
 
     private static final Logger logger = LoggerFactory.getLogger(TestController.class);
 
-    
     ObjectMapper objectMapper = new ObjectMapper();
 
-    
-    
-    
     @PostMapping(value = "/spat", consumes = "application/json", produces = "*/*")
     public @ResponseBody ResponseEntity<String> spat(@RequestBody String json) {
 
@@ -119,7 +117,7 @@ public class TestController {
             var bsmCoords = bsmPostData.bsmList;
             var bsmTemplate = bsmPostData.bsmTemplate;
             var bsmDataList = createBsmList(bsmCoords, bsmTemplate);
-            
+
             for (var bsmData : bsmDataList) {
                 var result = template.send(ODE_JSON_TOPIC, bsmData.toJson(false));
                 results.add(result.completable());
@@ -133,7 +131,7 @@ public class TestController {
                 logger.info("Sent: {}", sendResult);
                 strResults.append(String.format("%s%n", sendResult.toString()));
             }
-            
+
             return ResponseEntity.status(HttpStatus.OK).contentType(MediaType.TEXT_PLAIN).body(strResults.toString());
         } catch (Exception e) {
             return ResponseEntity.status(HttpStatus.OK).contentType(MediaType.TEXT_PLAIN)
@@ -151,36 +149,53 @@ public class TestController {
         return bsmDataList;
     }
 
+    ObjectMapper mapper = new ObjectMapper();
+
     public OdeBsmData createBsm(TimestampedCoordinate bsmCoord, int msgCnt, OdeBsmData bsmTemplate) {
+        OdeBsmData bsmTemplateClone = null;
+        try {
+            if (bsmTemplate != null) {
+                bsmTemplateClone = mapper.readValue(mapper.writeValueAsString(bsmTemplate), OdeBsmData.class);
+            }
+        } catch (JsonProcessingException e) {
+            logger.error("Error cloning OdeBsmData", e);
+        }
+
         var metadata = new OdeBsmMetadata();
-        if (bsmTemplate != null) {
-            metadata = (OdeBsmMetadata)bsmTemplate.getMetadata();
-        } else {
-            metadata.setOriginIp("127.0.0.1");
-        }
-        
-        
-        
+        if (bsmTemplateClone != null) {
+            metadata = (OdeBsmMetadata) bsmTemplateClone.getMetadata();
+        } 
+
         var coreData = new J2735BsmCoreData();
-        if (bsmTemplate != null) {
-            var templatePayload = (OdeBsmPayload)bsmTemplate.getPayload();
+        var position = new OdePosition3D();
+        if (bsmTemplateClone != null) {
+            var templatePayload = (OdeBsmPayload) bsmTemplateClone.getPayload();
             coreData = templatePayload.getBsm().getCoreData();
+            position = coreData.getPosition();
+        } else {
+            coreData.setPosition(position);
         }
+
         coreData.setMsgCnt(msgCnt);
-        
+
         var instant = Instant.ofEpochMilli(bsmCoord.getTimestamp());
         var ldt = LocalDateTime.ofInstant(instant, ZoneOffset.UTC);
         var secondOfMinute = ldt.getSecond();
-        var milliOfSecond = ldt.getNano() / (int)1e6;
+        var milliOfSecond = ldt.getNano() / (int) 1e6;
         var milliOfMinute = secondOfMinute * 1000 + milliOfSecond;
         coreData.setSecMark(milliOfMinute);
 
-        var position = new OdePosition3D();
         var mc = new MathContext(11, RoundingMode.DOWN);
         position.setLongitude(new BigDecimal(bsmCoord.getCoords()[0]).round(mc));
         position.setLatitude(new BigDecimal(bsmCoord.getCoords()[1]).round(mc));
-        position.setElevation(BigDecimal.ZERO);
-        coreData.setPosition(position);
+        if (position.getElevation() == null) {
+            position.setElevation(BigDecimal.ZERO);
+        }
+
+
+        coreData.setHeading(new BigDecimal(bsmCoord.getHeading()).round(mc));
+
+
         var bsm = new J2735Bsm();
         bsm.setCoreData(coreData);
         var payload = new OdeBsmPayload();

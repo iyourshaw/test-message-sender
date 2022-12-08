@@ -6,4 +6,5 @@ import lombok.Data;
 public class TimestampedCoordinate {
     long timestamp;
     double[] coords;
+    float heading;
 }

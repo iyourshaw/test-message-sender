@@ -10,7 +10,8 @@
     <script src="https://unpkg.com/leaflet@1.9.3/dist/leaflet.js"
         integrity="sha256-WBkoXOwTeyKclOHuWtc+i2uENFpDZ9YPdf5Hf+D7ewM=" crossorigin=""></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet.draw/0.4.14/leaflet.draw.js"></script>
-
+    <script src='https://unpkg.com/@turf/turf@6/turf.min.js'></script>
+   
 
 </head>
 
@@ -126,7 +127,7 @@
 
             /* Save the coordinates with the current timestamp */
             var ts = Date.now();
-            var bsm = { timestamp: ts, coords: [lon, lat] };
+            var bsm = { timestamp: ts, coords: [lon, lat], heading: 0 };
 
             /* Tag the layer with the bsm timestamp so we can find it to update or delete */
             layer.bsmTimestamp = ts;
@@ -142,6 +143,7 @@
             console.log('layerType ' + type + ' not used');
         }
     });
+
 
     map.on('draw:edited', function (e) {
         /* TODO update bsmList */
@@ -182,13 +184,18 @@
 
     async function sendBsmsAsync() {
         console.log(bsmList);
-
+        // Calculate bearing and speed
+        addHeading(bsmList);
+        console.log(bsmList);
         // If there is a BSM template, attach it
-        
-        let bsmText = document.getElementById("bsmTemplate").innerText;
-        let bsmJson = JSON.parse(bsmText);
-        let postData = { bsmList: bsmList, bsmTemplate: bsmJson };
-
+        let bsmTemplateObj = null;
+        try {
+            let bsmText = document.getElementById("bsmTemplate").innerText;
+            let bsmTemplateObj = JSON.parse(bsmText);
+        } catch { 
+            /* Ignore exception if there is no bsm template */
+        }
+        postData = { bsmList: bsmList, bsmTemplate: bsmTemplateObj };
         const response = await fetch('/createBsmMessages', {
             method: 'POST',
             cache: 'no-cache',
@@ -236,6 +243,33 @@
         console.log("uploadMapGeojson");
         if (e?.files.length > 0) {
             console.log(e.files[0]);
+        }
+    }
+
+    function addHeading(bsmArr) {
+        if (bsmArr.length <= 1) {
+            return;
+        }
+
+        for (var i = 1; i < bsmArr.length; i++) {
+            // Bearing and speed based on the previous point
+            var point1 = turf.point(bsmArr[i-1].coords);
+            var point2 = turf.point(bsmArr[i].coords);
+            var heading = turf.bearingToAzimuth(turf.bearing(point1, point2));
+
+            var distanceMeters = turf.distance(point1, point2, { units: 'kilometers' }) * 1000;
+
+            var t1 = bsmArr[i-1].timestamp;
+            var t2 = bsmArr[i].timestamp;
+            var speed = distanceMeters/(t2 - t2);
+
+            bsmArr[i].heading = heading;
+            bsmArr[i].speed = speed;
+            if (i == 1) {
+                // First point same as second
+                bsmArr[0].heading = heading;
+                bsmArr[0].speed = speed;
+            }
         }
     }
 
