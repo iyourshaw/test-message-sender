@@ -7,4 +7,5 @@ public class TimestampedCoordinate {
     long timestamp;
     double[] coords;
     float heading;
+    float speed;
 }

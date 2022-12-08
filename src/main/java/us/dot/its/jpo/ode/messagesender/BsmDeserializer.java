@@ -9,6 +9,7 @@ import com.fasterxml.jackson.core.JacksonException;
 import com.fasterxml.jackson.core.JsonGenerator;
 import com.fasterxml.jackson.core.JsonParser;
 import com.fasterxml.jackson.databind.DeserializationContext;
+import com.fasterxml.jackson.databind.DeserializationFeature;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.SerializerProvider;
@@ -24,6 +25,7 @@ import us.dot.its.jpo.ode.util.JsonUtils;
 public class BsmDeserializer extends StdDeserializer<OdeBsmData> {
 
     private static final Logger logger = LoggerFactory.getLogger(TestController.class);
+    private static final ObjectMapper om = new ObjectMapper().configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false);
 
     public BsmDeserializer() {
         this(null);
@@ -38,7 +40,7 @@ public class BsmDeserializer extends StdDeserializer<OdeBsmData> {
         try {
             JsonNode node = p.getCodec().readTree(p);
 
-            ObjectMapper om = new ObjectMapper();
+            
 
             // Deserialize the metadata
             JsonNode metadataNode = node.get("metadata");

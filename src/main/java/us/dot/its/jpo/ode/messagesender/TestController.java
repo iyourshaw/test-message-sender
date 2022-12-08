@@ -38,6 +38,7 @@ import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.JsonMappingException;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.module.SimpleModule;
 
 import us.dot.its.jpo.ode.model.OdeBsmData;
 import us.dot.its.jpo.ode.model.OdeBsmMetadata;
@@ -108,14 +109,39 @@ public class TestController {
 
     }
 
+    @PostMapping(value = "/bsmToLineDelimitedJson", consumes = "application/json", produces = "*/*")
+    public @ResponseBody ResponseEntity<String> bsmToLineDelimitedJson(@RequestBody BsmPostData bsmPostData) {
+        try {
+            var bsmCoords = bsmPostData.bsmList;
+            logger.info("bsmCoords: {}", bsmCoords);
+            var bsmTemplate = bsmPostData.bsmTemplate;
+            logger.info("bsmTemplate: {}", bsmTemplate);
+            var bsmDataList = createBsmList(bsmCoords, bsmTemplate);
+            StringBuilder sb = new StringBuilder();
+            for (var bsmData : bsmDataList) {
+                try {
+                    sb.append(String.format("%s%n", mapper.writeValueAsString(bsmData)));
+                } catch (JsonProcessingException e) {
+                    logger.error("Error writing ld json", e);
+                }
+            }
+            return ResponseEntity.status(HttpStatus.OK).contentType(MediaType.TEXT_PLAIN).body(sb.toString());
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.OK).contentType(MediaType.TEXT_PLAIN)
+                    .body(ExceptionUtils.getStackTrace(e));
+        }
+    }
+
     @PostMapping(value = "/createBsmMessages", consumes = "application/json", produces = "*/*")
     public @ResponseBody ResponseEntity<String> createBsms(@RequestBody BsmPostData bsmPostData) {
         final String ODE_JSON_TOPIC = "topic.OdeBsmJson";
-        logger.info("Received BSMs: {}", bsmPostData);
+        
         var results = new ArrayList<CompletableFuture<SendResult<String, String>>>();
         try {
             var bsmCoords = bsmPostData.bsmList;
+            logger.info("bsmCoords: {}", bsmCoords);
             var bsmTemplate = bsmPostData.bsmTemplate;
+            logger.info("bsmTemplate: {}", bsmTemplate);
             var bsmDataList = createBsmList(bsmCoords, bsmTemplate);
 
             for (var bsmData : bsmDataList) {
@@ -149,7 +175,14 @@ public class TestController {
         return bsmDataList;
     }
 
-    ObjectMapper mapper = new ObjectMapper();
+    final static ObjectMapper mapper;
+
+    static {
+        mapper = new ObjectMapper();
+        SimpleModule module = new SimpleModule();
+        module.addDeserializer(OdeBsmData.class, new BsmDeserializer());
+        mapper.registerModule(module);
+    }
 
     public OdeBsmData createBsm(TimestampedCoordinate bsmCoord, int msgCnt, OdeBsmData bsmTemplate) {
         OdeBsmData bsmTemplateClone = null;
@@ -184,6 +217,7 @@ public class TestController {
         var milliOfSecond = ldt.getNano() / (int) 1e6;
         var milliOfMinute = secondOfMinute * 1000 + milliOfSecond;
         coreData.setSecMark(milliOfMinute);
+        
 
         var mc = new MathContext(11, RoundingMode.DOWN);
         position.setLongitude(new BigDecimal(bsmCoord.getCoords()[0]).round(mc));
@@ -191,8 +225,9 @@ public class TestController {
         if (position.getElevation() == null) {
             position.setElevation(BigDecimal.ZERO);
         }
+        
 
-
+        coreData.setSpeed(new BigDecimal(bsmCoord.getSpeed()).round(mc));
         coreData.setHeading(new BigDecimal(bsmCoord.getHeading()).round(mc));
 
 

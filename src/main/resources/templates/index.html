@@ -191,7 +191,7 @@
         let bsmTemplateObj = null;
         try {
             let bsmText = document.getElementById("bsmTemplate").innerText;
-            let bsmTemplateObj = JSON.parse(bsmText);
+            bsmTemplateObj = JSON.parse(bsmText);
         } catch { 
             /* Ignore exception if there is no bsm template */
         }
@@ -261,7 +261,8 @@
 
             var t1 = bsmArr[i-1].timestamp;
             var t2 = bsmArr[i].timestamp;
-            var speed = distanceMeters/(t2 - t2);
+            var tSeconds = (t2 - t1)/1000;
+            var speed = distanceMeters/tSeconds;
 
             bsmArr[i].heading = heading;
             bsmArr[i].speed = speed;
