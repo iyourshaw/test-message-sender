@@ -8,6 +8,8 @@ import java.net.UnknownHostException;
 import java.time.Instant;
 import java.time.LocalDateTime;
 import java.time.ZoneOffset;
+import java.time.ZonedDateTime;
+import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
@@ -217,6 +219,13 @@ public class TestController {
         var milliOfSecond = ldt.getNano() / (int) 1e6;
         var milliOfMinute = secondOfMinute * 1000 + milliOfSecond;
         coreData.setSecMark(milliOfMinute);
+
+        var zdt = ZonedDateTime.ofInstant(instant, ZoneOffset.UTC);
+
+        // Round down to nearest minute
+        var zdtMinute = ZonedDateTime.of(zdt.getYear(), zdt.getMonthValue(), zdt.getDayOfMonth(), zdt.getHour(), zdt.getMinute(), 0, 0, ZoneOffset.UTC);
+        var dateTimeFormat = DateTimeFormatter.ISO_ZONED_DATE_TIME;
+        metadata.setOdeReceivedAt(dateTimeFormat.format(zdtMinute));
         
 
         var mc = new MathContext(11, RoundingMode.DOWN);

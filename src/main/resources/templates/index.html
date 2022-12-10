@@ -25,7 +25,10 @@
                     <button type="button" onclick="sendBsms();">Send BSMs to Kafka Topic</button>
                 </div>
                 <div>
-                    <button type="button" onclick="downloadBsms();">Download BSMs as line-delimited JSON</button>
+                    <button type="buttom" onclick="sendBsmsRealTime();">Send BSMs to Kafka Topic (Real Time)</button>
+                </div>
+                <div>
+                    <button type="button" onclick="downloadBsms();">Download BSMs (line-delimited JSON)</button>
                 </div>
                 <div>
                     Upload BSMs (line-delimited JSON)
@@ -39,9 +42,9 @@
                     Upload MAP GeoJSON
                     <input type="file" id="btnMapUpload" accept=".geojson,.json" onchange="uploadMapGeojson(this);" />
                 </div>
-                <div>
+                <!-- <div>
                     <button type="button" onclick="downloadMapGeojson();">Download MAP GeoJSON</button>
-                </div>
+                </div> -->
             </div>
             <div class="sideItem">
                 BSM Template
@@ -53,6 +56,7 @@
     </div>
 </body>
 <script>
+    
     var map = L.map('map').setView([39.5952649, -105.0914122], 19);
 
     /* Base Maps */
@@ -60,6 +64,7 @@
     var osmAttrib = '&copy; <a href="http://www.openstreetmap.org/copyright">OpenStreetMap</a>';
     var googUrl = 'https://mt1.google.com/vt/lyrs=y&x={x}&y={y}&z={z}';
     var googAttrib = 'Google Maps';
+    
     /* See https://www.thymeleaf.org/doc/tutorials/3.0/usingthymeleaf.html#javascript-inlining */
     var mapboxUrl = '[(${mapboxTileEndpoint})]';
     console.log(mapboxUrl);
@@ -68,10 +73,7 @@
     var empty = L.tileLayer('', { maxZoom: 22 });
     var osm = L.tileLayer(osmUrl, { maxZoom: 19, attribution: osmAttrib });
     var goog = L.tileLayer(googUrl, { maxZoom: 22, attribution: googAttrib });
-    var mapbox = L.tileLayer(mapboxUrl, {
-        maxZoom: 22,
-        attribution: mapboxAttrib
-    });
+    var mapbox = L.tileLayer(mapboxUrl, { maxZoom: 22, attribution: mapboxAttrib });
     var drawnItems = new L.FeatureGroup();
 
     var bsmList = [];  /* Array of timestamps/ BSM locations */
@@ -81,7 +83,11 @@
         'Open Street Map': osm.addTo(map),
         'Google Hybrid': goog.addTo(map),
         'Mapbox Satellite Streets': mapbox.addTo(map)
-    }, { 'Draw BSM Layer': drawnItems }, { positiion: 'topright', collapsed: false }).addTo(map);
+    }, { 
+        'Draw BSM Layer': drawnItems 
+    }, { 
+        positiion: 'topright', collapsed: false 
+    }).addTo(map);
 
 
     /* Shape draw controls */
@@ -127,7 +133,7 @@
 
             /* Save the coordinates with the current timestamp */
             var ts = Date.now();
-            var bsm = { timestamp: ts, coords: [lon, lat], heading: 0 };
+            var bsm = { timestamp: ts, coords: [lon, lat], heading: 0, speed: 0 };
 
             /* Tag the layer with the bsm timestamp so we can find it to update or delete */
             layer.bsmTimestamp = ts;
@@ -164,16 +170,18 @@
         const mapJson = await response.json();
         setMapGeojson(mapJson.mapFeatureCollection);
         setConnectingLanesGeojson(mapJson.connectingLanesFeatureCollection);
-        // console.log("MAP Geojson:");
-        // console.log(mapGeojson);
-        // const geojsonLayer = L.geoJSON(mapGeojson, {
-        //     style: {
-        //         color: '#f0f',
-        //         width: '1px',
-        //         opacity: 0.7
-        //     }
-        // }).addTo(map);
-        // layerControl.addOverlay(geojsonLayer, 'MAP Geojson');
+        
+    }
+
+    async function getBsmTemplate() {
+        const response = await fetch('BSMTemplate.json');
+        const text = await response.text();
+        setBsmTemplate(text);
+    }
+
+    function setBsmTemplate(text) {
+        var json = JSON.parse(text);
+        document.getElementById("bsmTemplate").innerText = JSON.stringify(json, null, 2);
     }
 
     let geojsonLayer = undefined;
@@ -211,6 +219,7 @@
 
 
     getMapGeojson();
+    getBsmTemplate();
 
     function sendBsms() {
         var result = sendBsmsAsync().then(successCallback, failureCallback);
@@ -218,7 +227,73 @@
         console.log(result);
     }
 
+    function sendBsmsRealTime() {
+        if (bsmList.length < 1) return;
+        console.log("sendBsmsRealTime");
+        
+        // Set the timestamps to start 1 second from now
+        const now = Date.now();
+        const firstTimestamp = bsmList[0].timestamp;
+        const offset = now - firstTimestamp + 1000;
+        for (const bsm of bsmList) {
+            bsm.timestamp += offset;
+        }
+        
+        const postData = prepareBsmPostData();
+        const bsmTemplate = postData.bsmTemplate;
+        const bsmItems = postData.bsmList;
+        let idx = 0;
+        
+        // Send each with timer
+        let nextTime = 1000;
+        console.log("Send in = " + nextTime);
+        setTimeout(function sendBsmTimed() {
+            const bsm = bsmItems[idx];
+            const postDataItem = { bsmList: [ bsm ], bsmTemplate: bsmTemplate };
+            sendBsmAsync(postDataItem).then(successCallback, failureCallback);
+            if (idx < bsmItems.length - 1) {
+                ++idx;
+                const nextBsm = bsmItems[idx];
+                nextTime = nextBsm.timestamp - Date.now();
+                if (nextTime < 0) {
+                    nextTime = 10;
+                }
+                console.log("Scheduling next BSM in " + nextTime)
+                setTimeout(sendBsmTimed, nextTime);
+            } else {
+                console.log("Completed Sending BSMs")
+            }
+        }, nextTime);
+    }
+
+    async function sendBsmAsync(postDataItem) {
+        const response = await fetch('/createBsmMessages', {
+            method: 'POST',
+            cache: 'no-cache',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify(postDataItem)
+        });
+        return response;
+    }
+
     async function sendBsmsAsync() {
+        let postData = prepareBsmPostData();
+        const response = await fetch('/createBsmMessages', {
+            method: 'POST',
+            cache: 'no-cache',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify(postData)
+        });
+        return response;
+    }
+
+    
+
+    function prepareBsmPostData() {
         console.log(bsmList);
         // Calculate bearing and speed
         addHeading(bsmList);
@@ -231,16 +306,8 @@
         } catch { 
             /* Ignore exception if there is no bsm template */
         }
-        postData = { bsmList: bsmList, bsmTemplate: bsmTemplateObj };
-        const response = await fetch('/createBsmMessages', {
-            method: 'POST',
-            cache: 'no-cache',
-            headers: {
-                'Content-Type': 'application/json'
-            },
-            body: JSON.stringify(postData)
-        });
-        return response;
+        let postData = { bsmList: bsmList, bsmTemplate: bsmTemplateObj };
+        return postData;
     }
 
     function successCallback(e) {
@@ -255,22 +322,71 @@
 
     function uploadBsms(e) {
         console.log("uploadBsms");
+       
+
         if (e?.files.length > 0) {
-            console.log(e.files[0]);
+            let file = e.files[0];
+           
+            file.text().then(text => {
+                // Clear exising bsms
+                bsmList.length = 0;
+                const lines = text.split(/\r?\n/);
+                for (const line of lines) {
+                    if (line) {
+                        const json = JSON.parse(line);
+                        console.log(json);
+                        var bsm = extractBsmData(json);
+                        bsmList.push(bsm);
+                        addCircleMarker(bsm);
+                    }
+                }
+            });
         }
     }
+
+    function extractBsmData(json) {
+        const dt = new Date(Date.parse(json.metadata.odeReceivedAt));
+        console.log(dt);
+        const minuteMillis = Date.UTC(dt.getUTCFullYear(), dt.getUTCMonth(), dt.getUTCDay(), dt.getUTCHours(), dt.getUTCMinutes(), 0, 0);     
+        const coreData = json.payload.data.coreData;
+        const secMark = coreData.secMark;
+        const millis = minuteMillis + secMark;
+        
+        const position = coreData.position;
+        const lon = position.longitude;
+        const lat = position.latitude;
+        
+        const heading = coreData.heading;
+        const speed = coreData.speed;
+        
+        const bsm =  { timestamp: millis, coords: [lon, lat], heading: heading, speed: speed };
+        console.log(bsm);
+        return bsm;
+    }
+
+    function addCircleMarker(bsm) {
+        const latlng = L.latLng(bsm.coords[1], bsm.coords[0]);
+        const options = {
+                color: '#f00',
+                fillOpacity: 0.9,
+                stroke: false,
+                radius: 5
+            };
+        const circlemarker = L.circleMarker(latlng, options); 
+        drawnItems.addLayer(circlemarker);
+    }
+
+    
 
     function uploadBsmTemplate(e) {
         console.log("uploadBsmTemplate")
         if (e?.files.length > 0) {
             let file = e.files[0];
-            console.log(file);
-            let objUrl = window.URL.createObjectURL(file);
-            console.log(objUrl);
-            file.text().then(text => {
-                var json = JSON.parse(text);
-                console.log(json);
-                document.getElementById("bsmTemplate").innerText = JSON.stringify(json, null, 2);
+            // console.log(file);
+            // let objUrl = window.URL.createObjectURL(file);
+            // console.log(objUrl);
+            file.text().then(text => {  
+                setBsmTemplate(text);
             });
         }
     }
@@ -279,7 +395,7 @@
         console.log("uploadMapGeojson");
         if (e?.files.length > 0) {
             let file = e.files[0];
-            let objUrl = window.URL.createObjectURL(file);
+            // let objUrl = window.URL.createObjectURL(file);
             file.text().then(text => {
                 var json = JSON.parse(text);
                 console.log(json);
@@ -316,6 +432,8 @@
             }
         }
     }
+
+   
 
 
 </script>
