@@ -11,8 +11,7 @@
         integrity="sha256-WBkoXOwTeyKclOHuWtc+i2uENFpDZ9YPdf5Hf+D7ewM=" crossorigin=""></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet.draw/0.4.14/leaflet.draw.js"></script>
     <script src='https://unpkg.com/@turf/turf@6/turf.min.js'></script>
-   
-
+    <title>Test Message Sender</title>
 </head>
 
 <body>
@@ -32,7 +31,7 @@
                 </div>
                 <div>
                     Upload BSMs (line-delimited JSON)
-                    <input type="file" accept=".jsonl,.ndjson,.csv,.json" onchange="uploadBsms(this);"/>
+                    <input type="file" accept=".jsonl,.ndjson,.csv,.json" onchange="uploadBsms(this);" />
                 </div>
                 <div>
                     Upload BSM template
@@ -50,13 +49,13 @@
                 BSM Template
             </div>
             <div class="sideItem jsonDocument" id="bsmTemplate" contenteditable="true" spellcheck="false">
-                
+
             </div>
         </div>
     </div>
 </body>
 <script>
-    
+
     var map = L.map('map').setView([39.5952649, -105.0914122], 19);
 
     /* Base Maps */
@@ -64,7 +63,7 @@
     var osmAttrib = '&copy; <a href="http://www.openstreetmap.org/copyright">OpenStreetMap</a>';
     var googUrl = 'https://mt1.google.com/vt/lyrs=y&x={x}&y={y}&z={z}';
     var googAttrib = 'Google Maps';
-    
+
     /* See https://www.thymeleaf.org/doc/tutorials/3.0/usingthymeleaf.html#javascript-inlining */
     var mapboxUrl = '[(${mapboxTileEndpoint})]';
     console.log(mapboxUrl);
@@ -74,19 +73,20 @@
     var osm = L.tileLayer(osmUrl, { maxZoom: 19, attribution: osmAttrib });
     var goog = L.tileLayer(googUrl, { maxZoom: 22, attribution: googAttrib });
     var mapbox = L.tileLayer(mapboxUrl, { maxZoom: 22, attribution: mapboxAttrib });
-    var drawnItems = new L.FeatureGroup();
+    const drawnItems = new L.FeatureGroup();
 
-    var bsmList = [];  /* Array of timestamps/ BSM locations */
+    const bsmList = [];  /* Array of timestamps/ BSM locations */
+    const bsmMap = new Map();   /* Map of Lists of BSMs grouped by BSM ID */
 
     var layerControl = L.control.layers({
         'No Base Map': empty.addTo(map),
         'Open Street Map': osm.addTo(map),
         'Google Hybrid': goog.addTo(map),
         'Mapbox Satellite Streets': mapbox.addTo(map)
-    }, { 
-        'Draw BSM Layer': drawnItems 
-    }, { 
-        positiion: 'topright', collapsed: false 
+    }, {
+        'Draw BSM Layer': drawnItems
+    }, {
+        positiion: 'topright', collapsed: false
     }).addTo(map);
 
 
@@ -170,7 +170,7 @@
         const mapJson = await response.json();
         setMapGeojson(mapJson.mapFeatureCollection);
         setConnectingLanesGeojson(mapJson.connectingLanesFeatureCollection);
-        
+
     }
 
     async function getBsmTemplate() {
@@ -228,46 +228,76 @@
     }
 
     function sendBsmsRealTime() {
-        if (bsmList.length < 1) return;
+        if (bsmMap.size < 1) return;
         console.log("sendBsmsRealTime");
-        
-        // Set the timestamps to start 1 second from now
+
+        for (const id of bsmMap.keys()) {
+            console.log("Sending BSMs with ID " + id);
+
+            const theBsmList = bsmMap.get(id);
+
+            sendBsmListRealTime(id, theBsmList);
+        }
+    }
+
+    function sendBsmListRealTime(id, theBsmList) {
+
+        // Set the timestamps to start 500 ms from now
+        const startIn = 500;
         const now = Date.now();
-        const firstTimestamp = bsmList[0].timestamp;
-        const offset = now - firstTimestamp + 1000;
-        for (const bsm of bsmList) {
+        const firstTimestamp = theBsmList[0].timestamp;
+        const offset = now - firstTimestamp + startIn;
+        for (const bsm of theBsmList) {
             bsm.timestamp += offset;
         }
-        
-        const postData = prepareBsmPostData();
-        const bsmTemplate = postData.bsmTemplate;
-        const bsmItems = postData.bsmList;
+
+        const bsmTemplate = getCurrentBsmTemplate();
+
         let idx = 0;
-        
+
         // Send each with timer
-        let nextTime = 1000;
-        console.log("Send in = " + nextTime);
+        let nextTime = startIn;
+        console.log("Sending BSM id = " + id + " in " + nextTime + " ms");
         setTimeout(function sendBsmTimed() {
-            const bsm = bsmItems[idx];
-            const postDataItem = { bsmList: [ bsm ], bsmTemplate: bsmTemplate };
+            const bsm = theBsmList[idx];
+            const postDataItem = buildBsmFromTemplate(bsm, bsmTemplate);
             sendBsmAsync(postDataItem).then(successCallback, failureCallback);
-            if (idx < bsmItems.length - 1) {
+            if (idx < theBsmList.length - 1) {
                 ++idx;
-                const nextBsm = bsmItems[idx];
+                const nextBsm = theBsmList[idx];
                 nextTime = nextBsm.timestamp - Date.now();
                 if (nextTime < 0) {
                     nextTime = 10;
                 }
-                console.log("Scheduling next BSM in " + nextTime)
+                console.log("Sending BSM id = " + id + " in " + nextTime + " ms");
                 setTimeout(sendBsmTimed, nextTime);
             } else {
-                console.log("Completed Sending BSMs")
+                console.log("Completed Sending BSMs with id = " + id);
             }
         }, nextTime);
     }
 
+    function buildBsmFromTemplate(bsm, bsmTemplate) {
+        // Copy via serialization
+        const bsmJson = JSON.stringify(bsmTemplate);
+        const bsmObj = JSON.parse(bsmJson);
+        bsmObj.payload.data.coreData.id = bsm.id;
+        bsmObj.payload.data.coreData.msgCnt = bsm.msgCnt;
+        bsmObj.payload.data.coreData.speed = bsm.speed;
+        bsmObj.payload.data.coreData.heading = bsm.heading;
+        bsmObj.payload.data.coreData.position.longitude = bsm.coords[0];
+        bsmObj.payload.data.coreData.position.latitude = bsm.coords[1];
+        const dt = new Date(bsm.timestamp);
+        const minuteMillis = Date.UTC(dt.getUTCFullYear(), dt.getUTCMonth(), dt.getUTCDay(), dt.getUTCHours(), dt.getUTCMinutes(), 0, 0);
+        const millis = dt - minuteMillis;
+        bsmObj.payload.data.coreData.secMark = millis;
+        bsmObj.metadata.originIp = bsm.originIp;
+        bsmObj.metadata.odeReceivedAt = dt.toISOString();
+        return bsmObj;
+    }
+
     async function sendBsmAsync(postDataItem) {
-        const response = await fetch('/createBsmMessages', {
+        const response = await fetch('/kafka/topic.OdeBsmJson', {
             method: 'POST',
             cache: 'no-cache',
             headers: {
@@ -291,7 +321,9 @@
         return response;
     }
 
-    
+
+
+
 
     function prepareBsmPostData() {
         console.log(bsmList);
@@ -299,20 +331,25 @@
         addHeading(bsmList);
         console.log(bsmList);
         // If there is a BSM template, attach it
+        const bsmTemplateObj = getCurrentBsmTemplate();
+        const postData = { bsmList: bsmList, bsmTemplate: bsmTemplateObj };
+        return postData;
+    }
+
+    function getCurrentBsmTemplate() {
         let bsmTemplateObj = null;
         try {
             let bsmText = document.getElementById("bsmTemplate").innerText;
             bsmTemplateObj = JSON.parse(bsmText);
-        } catch { 
+        } catch {
             /* Ignore exception if there is no bsm template */
         }
-        let postData = { bsmList: bsmList, bsmTemplate: bsmTemplateObj };
-        return postData;
+        return bsmTemplateObj;
     }
 
     function successCallback(e) {
-        console.log("success");
-        console.log(e);
+        //console.log("success");
+        //console.log(e);
     }
 
     function failureCallback(e) {
@@ -322,11 +359,11 @@
 
     function uploadBsms(e) {
         console.log("uploadBsms");
-       
+
 
         if (e?.files.length > 0) {
             let file = e.files[0];
-           
+
             file.text().then(text => {
                 // Clear exising bsms
                 bsmList.length = 0;
@@ -334,50 +371,75 @@
                 for (const line of lines) {
                     if (line) {
                         const json = JSON.parse(line);
-                        console.log(json);
+                        //console.log(json);
                         var bsm = extractBsmData(json);
                         bsmList.push(bsm);
                         addCircleMarker(bsm);
                     }
                 }
-                bsmList.sort((a, b) => a.timestamp - b.timestamp);
+
+                console.log("Uploaded " + bsmList.length + " BSMs");
+
+                // Find distinct BSM IDs
+                const idList = bsmList.map((value, idx, arr) => value.id + '');
+                const idSet = new Set();
+                for (const id of idList) {
+                    idSet.add(id);
+                }
+                console.log("idSet");
+                console.log(idSet);
+
+                // Group by ID and sort by timestamp
+                bsmMap.clear();
+                for (const id of idSet) {
+                    const bsmIdList = bsmList.filter(bsm => bsm.id == id);
+                    bsmIdList.sort((a, b) => a.timestamp - b.timestamp);
+                    bsmMap.set(id, bsmIdList);
+                }
+
+
+
             });
         }
     }
 
     function extractBsmData(json) {
         const dt = new Date(Date.parse(json.metadata.odeReceivedAt));
-        console.log(dt);
-        const minuteMillis = Date.UTC(dt.getUTCFullYear(), dt.getUTCMonth(), dt.getUTCDay(), dt.getUTCHours(), dt.getUTCMinutes(), 0, 0);     
+        //console.log(dt);
+        const minuteMillis = Date.UTC(dt.getUTCFullYear(), dt.getUTCMonth(), dt.getUTCDay(), dt.getUTCHours(), dt.getUTCMinutes(), 0, 0);
         const coreData = json.payload.data.coreData;
         const secMark = coreData.secMark;
         const millis = minuteMillis + secMark;
-        
+
         const position = coreData.position;
         const lon = position.longitude;
         const lat = position.latitude;
-        
+
         const heading = coreData.heading;
         const speed = coreData.speed;
-        
-        const bsm =  { timestamp: millis, coords: [lon, lat], heading: heading, speed: speed };
-        console.log(bsm);
+        const id = coreData.id + ''; // Cast to string
+        const msgCnt = coreData.msgCnt;
+
+        const originIp = json.metadata.originIp;
+
+        const bsm = { timestamp: millis, coords: [lon, lat], heading: heading, speed: speed, id: id, msgCnt: msgCnt, originIp: originIp };
+        //console.log(bsm);
         return bsm;
     }
 
     function addCircleMarker(bsm) {
         const latlng = L.latLng(bsm.coords[1], bsm.coords[0]);
         const options = {
-                color: '#f00',
-                fillOpacity: 0.9,
-                stroke: false,
-                radius: 5
-            };
-        const circlemarker = L.circleMarker(latlng, options); 
+            color: '#f00',
+            fillOpacity: 0.9,
+            stroke: false,
+            radius: 5
+        };
+        const circlemarker = L.circleMarker(latlng, options);
         drawnItems.addLayer(circlemarker);
     }
 
-    
+
 
     function uploadBsmTemplate(e) {
         console.log("uploadBsmTemplate")
@@ -386,7 +448,7 @@
             // console.log(file);
             // let objUrl = window.URL.createObjectURL(file);
             // console.log(objUrl);
-            file.text().then(text => {  
+            file.text().then(text => {
                 setBsmTemplate(text);
             });
         }
@@ -413,16 +475,16 @@
 
         for (var i = 1; i < bsmArr.length; i++) {
             // Bearing and speed based on the previous point
-            var point1 = turf.point(bsmArr[i-1].coords);
+            var point1 = turf.point(bsmArr[i - 1].coords);
             var point2 = turf.point(bsmArr[i].coords);
             var heading = turf.bearingToAzimuth(turf.bearing(point1, point2));
 
             var distanceMeters = turf.distance(point1, point2, { units: 'kilometers' }) * 1000;
 
-            var t1 = bsmArr[i-1].timestamp;
+            var t1 = bsmArr[i - 1].timestamp;
             var t2 = bsmArr[i].timestamp;
-            var tSeconds = (t2 - t1)/1000;
-            var speed = distanceMeters/tSeconds;
+            var tSeconds = (t2 - t1) / 1000;
+            var speed = distanceMeters / tSeconds;
 
             bsmArr[i].heading = heading;
             bsmArr[i].speed = speed;
@@ -436,7 +498,7 @@
 
     }
 
-   
+
 
 
 </script>
