@@ -340,6 +340,7 @@
                         addCircleMarker(bsm);
                     }
                 }
+                bsmList.sort((a, b) => a.timestamp - b.timestamp);
             });
         }
     }
@@ -431,6 +432,8 @@
                 bsmArr[0].speed = speed;
             }
         }
+
+
     }
 
    
