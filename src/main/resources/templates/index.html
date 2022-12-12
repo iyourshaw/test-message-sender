@@ -10,7 +10,7 @@
     <script src="https://unpkg.com/leaflet@1.9.3/dist/leaflet.js"
         integrity="sha256-WBkoXOwTeyKclOHuWtc+i2uENFpDZ9YPdf5Hf+D7ewM=" crossorigin=""></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet.draw/0.4.14/leaflet.draw.js"></script>
-    <script src='https://unpkg.com/@turf/turf@6/turf.min.js'></script>
+    <!-- <script src='https://unpkg.com/@turf/turf@6/turf.min.js'></script> -->
     <title>Test Message Sender</title>
 </head>
 
@@ -76,7 +76,7 @@
     const drawnItems = new L.FeatureGroup();
 
     const bsmList = [];  /* Array of timestamps/ BSM locations */
-    const bsmMap = new Map();   /* Map of Lists of BSMs grouped by BSM ID */
+   
 
     var layerControl = L.control.layers({
         'No Base Map': empty.addTo(map),
@@ -228,27 +228,21 @@
     }
 
     function sendBsmsRealTime() {
-        if (bsmMap.size < 1) return;
+        if (bsmList.length < 1) return;
         console.log("sendBsmsRealTime");
-
-        for (const id of bsmMap.keys()) {
-            console.log("Sending BSMs with ID " + id);
-
-            const theBsmList = bsmMap.get(id);
-
-            sendBsmListRealTime(id, theBsmList);
-        }
+        sendBsmListRealTime(bsmList);
     }
 
-    function sendBsmListRealTime(id, theBsmList) {
+    function sendBsmListRealTime(theBsmList) {
 
         // Set the timestamps to start 500 ms from now
         const startIn = 500;
         const now = Date.now();
-        const firstTimestamp = theBsmList[0].timestamp;
-        const offset = now - firstTimestamp + startIn;
+        const firstTimestamp = theBsmList[0].odeReceivedAt;
+        let offset = now - firstTimestamp + startIn;
         for (const bsm of theBsmList) {
             bsm.timestamp += offset;
+            bsm.odeReceivedAt += offset;
         }
 
         const bsmTemplate = getCurrentBsmTemplate();
@@ -257,17 +251,29 @@
 
         // Send each with timer
         let nextTime = startIn;
-        console.log("Sending BSM id = " + id + " in " + nextTime + " ms");
+        console.log("Sending BSM in " + nextTime + " ms");
         setTimeout(function sendBsmTimed() {
             const bsm = theBsmList[idx];
+            // bsm.timestamp += offset;
+            // bsm.odeReceivedAt += offset;
+            // let ts = new Date(bsm.timestamp);
+            // let ora = new Date(bsm.odeReceivedAt);
+            // console.log(ts);
+            // console.log(ora);
+            const id = bsm.id;
             const postDataItem = buildBsmFromTemplate(bsm, bsmTemplate);
             sendBsmAsync(postDataItem).then(successCallback, failureCallback);
             if (idx < theBsmList.length - 1) {
                 ++idx;
                 const nextBsm = theBsmList[idx];
-                nextTime = nextBsm.timestamp - Date.now();
+                nextTime = nextBsm.odeReceivedAt - Date.now();
+                console.log(nextTime);
                 if (nextTime < 0) {
-                    nextTime = 10;
+                    nextTime = 0;
+                }
+                if (nextTime > 5000) {
+                    nextTime = 5000;
+                    //offset = Date.now() - nextBsm.odeReceivedAt;
                 }
                 console.log("Sending BSM id = " + id + " in " + nextTime + " ms");
                 setTimeout(sendBsmTimed, nextTime);
@@ -288,11 +294,15 @@
         bsmObj.payload.data.coreData.position.longitude = bsm.coords[0];
         bsmObj.payload.data.coreData.position.latitude = bsm.coords[1];
         const dt = new Date(bsm.timestamp);
-        const minuteMillis = Date.UTC(dt.getUTCFullYear(), dt.getUTCMonth(), dt.getUTCDay(), dt.getUTCHours(), dt.getUTCMinutes(), 0, 0);
-        const millis = dt - minuteMillis;
+        const dtMillis = dt.getTime();
+        const dtMinute = new Date(dt.getFullYear(), dt.getMonth(), dt.getDate(), dt.getHours(), dt.getMinutes(), 0, 0);
+        const minuteMillis = dtMinute.getTime();
+        const millis = dtMillis - minuteMillis;
         bsmObj.payload.data.coreData.secMark = millis;
         bsmObj.metadata.originIp = bsm.originIp;
-        bsmObj.metadata.odeReceivedAt = dt.toISOString();
+
+        
+        bsmObj.metadata.odeReceivedAt = new Date(bsm.odeReceivedAt).toISOString();
         return bsmObj;
     }
 
@@ -328,7 +338,7 @@
     function prepareBsmPostData() {
         console.log(bsmList);
         // Calculate bearing and speed
-        addHeading(bsmList);
+        //addHeading(bsmList);
         console.log(bsmList);
         // If there is a BSM template, attach it
         const bsmTemplateObj = getCurrentBsmTemplate();
@@ -389,24 +399,17 @@
                 console.log("idSet");
                 console.log(idSet);
 
-                // Group by ID and sort by timestamp
-                bsmMap.clear();
-                for (const id of idSet) {
-                    const bsmIdList = bsmList.filter(bsm => bsm.id == id);
-                    bsmIdList.sort((a, b) => a.timestamp - b.timestamp);
-                    bsmMap.set(id, bsmIdList);
-                }
-
-
-
+                // Sort by ode ingest time
+                bsmList.sort((a, b) => a.odeReceivedAt - b.odeReceivedAt);
             });
         }
     }
 
     function extractBsmData(json) {
-        const dt = new Date(Date.parse(json.metadata.odeReceivedAt));
+        const dtReceivedAtMillis = Date.parse(json.metadata.odeReceivedAt);
+        const dt = new Date(dtReceivedAtMillis);
         //console.log(dt);
-        const minuteMillis = Date.UTC(dt.getUTCFullYear(), dt.getUTCMonth(), dt.getUTCDay(), dt.getUTCHours(), dt.getUTCMinutes(), 0, 0);
+        const minuteMillis = Date.UTC(dt.getUTCFullYear(), dt.getUTCMonth(), dt.getUTCDate(), dt.getUTCHours(), dt.getUTCMinutes(), 0, 0);
         const coreData = json.payload.data.coreData;
         const secMark = coreData.secMark;
         const millis = minuteMillis + secMark;
@@ -422,7 +425,8 @@
 
         const originIp = json.metadata.originIp;
 
-        const bsm = { timestamp: millis, coords: [lon, lat], heading: heading, speed: speed, id: id, msgCnt: msgCnt, originIp: originIp };
+
+        const bsm = { odeReceivedAt: dtReceivedAtMillis, timestamp: millis, coords: [lon, lat], heading: heading, speed: speed, id: id, msgCnt: msgCnt, originIp: originIp };
         //console.log(bsm);
         return bsm;
     }
@@ -468,35 +472,35 @@
         }
     }
 
-    function addHeading(bsmArr) {
-        if (bsmArr.length <= 1) {
-            return;
-        }
+    // function addHeading(bsmArr) {
+    //     if (bsmArr.length <= 1) {
+    //         return;
+    //     }
 
-        for (var i = 1; i < bsmArr.length; i++) {
-            // Bearing and speed based on the previous point
-            var point1 = turf.point(bsmArr[i - 1].coords);
-            var point2 = turf.point(bsmArr[i].coords);
-            var heading = turf.bearingToAzimuth(turf.bearing(point1, point2));
+    //     for (var i = 1; i < bsmArr.length; i++) {
+    //         // Bearing and speed based on the previous point
+    //         var point1 = turf.point(bsmArr[i - 1].coords);
+    //         var point2 = turf.point(bsmArr[i].coords);
+    //         var heading = turf.bearingToAzimuth(turf.bearing(point1, point2));
 
-            var distanceMeters = turf.distance(point1, point2, { units: 'kilometers' }) * 1000;
+    //         var distanceMeters = turf.distance(point1, point2, { units: 'kilometers' }) * 1000;
 
-            var t1 = bsmArr[i - 1].timestamp;
-            var t2 = bsmArr[i].timestamp;
-            var tSeconds = (t2 - t1) / 1000;
-            var speed = distanceMeters / tSeconds;
+    //         var t1 = bsmArr[i - 1].timestamp;
+    //         var t2 = bsmArr[i].timestamp;
+    //         var tSeconds = (t2 - t1) / 1000;
+    //         var speed = distanceMeters / tSeconds;
 
-            bsmArr[i].heading = heading;
-            bsmArr[i].speed = speed;
-            if (i == 1) {
-                // First point same as second
-                bsmArr[0].heading = heading;
-                bsmArr[0].speed = speed;
-            }
-        }
+    //         bsmArr[i].heading = heading;
+    //         bsmArr[i].speed = speed;
+    //         if (i == 1) {
+    //             // First point same as second
+    //             bsmArr[0].heading = heading;
+    //             bsmArr[0].speed = speed;
+    //         }
+    //     }
 
 
-    }
+    // }
 
 
 
