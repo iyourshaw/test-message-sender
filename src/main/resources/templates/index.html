@@ -45,9 +45,10 @@
                     Upload ProcessdMap GeoJSON
                     <input type="file" id="btnMapUpload" accept=".geojson,.json" onchange="uploadMapGeojson(this);" />
                 </div>
-                <!-- <div>
-                    <button type="button" onclick="downloadMapGeojson();">Download MAP GeoJSON</button>
-                </div> -->
+                <div>
+                    <button type="button" onclick="startSendingMap();">Start sending MAP</button>
+                </div>
+                
             </div>
             <div class="sideItem">
                 BSM Template
@@ -68,7 +69,7 @@
     var googUrl = 'https://mt1.google.com/vt/lyrs=y&x={x}&y={y}&z={z}';
     var googAttrib = 'Google Maps';
 
-    //var oamBelleviewUrl = 'https://tiles.openaerialmap.org/5bcf6b6a91037900144c3d6e/0/5bcf6b6a91037900144c3dc3/{z}/{x}/{y}';
+    
     var oamAttrib = '<a href="http://openaerialmap.org/about/" target="_blank">Open Aerial Map</a>';
 
     /* See https://www.thymeleaf.org/doc/tutorials/3.0/usingthymeleaf.html#javascript-inlining */
@@ -80,7 +81,7 @@
     var osm = L.tileLayer(osmUrl, { maxZoom: 19, attribution: osmAttrib });
     var goog = L.tileLayer(googUrl, { maxZoom: 22, attribution: googAttrib });
     var mapbox = L.tileLayer(mapboxUrl, { maxZoom: 22, attribution: mapboxAttrib });
-    //var oam = L.tileLayer(oamBelleviewUrl, {maxZoom: 22, minZoom: 15, attribution: oamAttrib });
+    
 
     // Open Aerial Map
     const oamUrlArr = [
@@ -133,18 +134,7 @@
     };
    
 
-    // var layerControl = L.control.layers({
-    //     'No Base Map': empty.addTo(map),       
-    //     'Google Hybrid': goog.addTo(map),
-    //     'Mapbox Satellite Streets': mapbox.addTo(map),     
-    //     'Open Street Map': osm.addTo(map)  
-    // }, {
-    //     'Open Aerial Map': oam.addTo(map),
-    //     'Draw BSM Layer': drawnItems
-    // }, {
-    //     positiion: 'topright', collapsed: false
-    // }).addTo(map);
-
+   
     var layerControl = L.control.layers(baseMaps, overlayMaps, {
         positiion: 'topright', collapsed: false
     }).addTo(map);
@@ -226,10 +216,11 @@
 
     async function getMapGeojson() {
         //const response = await fetch('map_wadsworth_and_coalmine.geojson');
-        const response = await fetch('processed_map_v4.json');
+        const response = await fetch('MAP_wadsworth_and_coalmine.json');
         const mapJson = await response.json();
-        setMapGeojson(mapJson.mapFeatureCollection);
-        setConnectingLanesGeojson(mapJson.connectingLanesFeatureCollection);
+        odeMapJsonToGeojson(text)
+        // setMapGeojson(mapJson.mapFeatureCollection);
+        // setConnectingLanesGeojson(mapJson.connectingLanesFeatureCollection);
 
     }
 
@@ -316,6 +307,7 @@
         // Send each with timer
         let nextTime = startIn;
         console.log("Sending BSM in " + nextTime + " ms");
+        let correctionOffset = 0;
         setTimeout(function sendBsmTimed() {
             const bsm = theBsmList[idx];
             // bsm.timestamp += offset;
@@ -330,13 +322,18 @@
             if (idx < theBsmList.length - 1) {
                 ++idx;
                 const nextBsm = theBsmList[idx];
-                nextTime = nextBsm.odeReceivedAt - Date.now();
+                nextTime = nextBsm.odeReceivedAt - Date.now() - correctionOffset;
                 console.log(nextTime);
                 if (nextTime < 0) {
                     nextTime = 0;
+                    if (nextTime < -500) {
+                        correctionOffset = 0;
+                    }
                 }
-                if (nextTime > 5000) {
-                    nextTime = 5000;
+               
+                if (nextTime > 500) {
+                    correctionOffset = nextTime - 500;
+                    nextTime = 500;
                     //offset = Date.now() - nextBsm.odeReceivedAt;
                 }
                 console.log("Sending BSM id = " + id + " in " + nextTime + " ms");
@@ -542,24 +539,26 @@
             let file = e.files[0];
             console.log("MAP JSON File:");
             console.log(file);
-            file.text().then(
-                text => {
-                    //const json = JSON.parse(text);
-                    odeMapJsonToGeojsonAsync(text).then(
-                        response => response.json(), 
-                        failureCallback
-                    ).then(
-                        // Success callback
-                        json => {
-                            console.log(json);
-                            setMapGeojson(json.mapFeatureCollection);
-                            setConnectingLanesGeojson(json.connectingLanesFeatureCollection);
-                        },
-                        failureCallback
-                    );
-                
-                });
+            file.text().then(text => odeMapJsonToGeojson(text));
         }
+    }
+
+    var odeMapTemplate;
+
+    function odeMapJsonToGeojson(text) {
+        odeMapTemplate = JSON.parse(text);
+        odeMapJsonToGeojsonAsync(text).then(
+            response => response.json(), 
+            failureCallback
+        ).then(
+            // Success callback
+            json => {
+                console.log(json);
+                setMapGeojson(json.mapFeatureCollection);
+                setConnectingLanesGeojson(json.connectingLanesFeatureCollection);
+            },
+            failureCallback
+        );
     }
 
     async function odeMapJsonToGeojsonAsync(json) {
@@ -572,6 +571,29 @@
             body: json
         });
         return response;
+    }
+
+    function startSendingMap(odeMap, intervalMs) {
+        setTimeout(function sendMapTimed() {
+            const odeMap = buildMapFromTemplate(odeMapTemplate);
+            sendMapAsync(odeMap).then(successCallback, failureCallback);
+        }, intervalMs)
+    }
+
+    async function sendMapAsync(odeMap) {
+        const response = await fetch('/kafka/topic.OdeMapJson', {
+            method: 'POST',
+            cache: 'no-cache',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify(odeMap)
+        })
+    }
+
+    function buildMapFromTemplate() {
+        // TODO set timestamp
+        return odeMapTemplate;
     }
 
     // function addHeading(bsmArr) {

@@ -29,29 +29,7 @@ public class TestMessageSenderApplication extends SpringBootServletInitializer {
 		SpringApplication.run(TestMessageSenderApplication.class, args);
 	}
 
-	// @Bean
-	// public CommandLineRunner commandLineRunner(ApplicationContext ctx) {
-	// 	return args -> {
-
-	// 		System.out.println("Let's inspect the beans provided by Spring Boot:");
-
-	// 		String[] beanNames = ctx.getBeanDefinitionNames();
-	// 		Arrays.sort(beanNames);
-	// 		for (String beanName : beanNames) {
-	// 			System.out.println(beanName);
-	// 		}
-
-	// 	};
-	// }
-
-	// @Bean
-	// public NewTopic topic() {
-	// 	return TopicBuilder.name("topic1")
-	// 		.partitions(1)
-	// 		.replicas(1)
-	// 		.build();
-	// }
-
+	
 	
 	
 

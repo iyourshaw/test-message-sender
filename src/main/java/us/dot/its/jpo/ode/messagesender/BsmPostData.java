@@ -11,7 +11,7 @@ public class BsmPostData {
     
     TimestampedCoordinateList bsmList;
 
-    @JsonDeserialize(using = BsmDeserializer.class)
+    //@JsonDeserialize(using = BsmDeserializer.class)
     OdeBsmData bsmTemplate;
 
 }
