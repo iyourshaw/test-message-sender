@@ -64,9 +64,12 @@
 
     /* Base Maps */
     var osmUrl = 'https://tile.openstreetmap.org/{z}/{x}/{y}.png';
-    var osmAttrib = '&copy; <a href="http://www.openstreetmap.org/copyright">OpenStreetMap</a>';
+    var osmAttrib = '&copy; <a href="http://www.openstreetmap.org/copyright" target="_blank">OpenStreetMap</a>';
     var googUrl = 'https://mt1.google.com/vt/lyrs=y&x={x}&y={y}&z={z}';
     var googAttrib = 'Google Maps';
+
+    //var oamBelleviewUrl = 'https://tiles.openaerialmap.org/5bcf6b6a91037900144c3d6e/0/5bcf6b6a91037900144c3dc3/{z}/{x}/{y}';
+    var oamAttrib = '<a href="http://openaerialmap.org/about/" target="_blank">Open Aerial Map</a>';
 
     /* See https://www.thymeleaf.org/doc/tutorials/3.0/usingthymeleaf.html#javascript-inlining */
     var mapboxUrl = '[(${mapboxTileEndpoint})]';
@@ -77,19 +80,72 @@
     var osm = L.tileLayer(osmUrl, { maxZoom: 19, attribution: osmAttrib });
     var goog = L.tileLayer(googUrl, { maxZoom: 22, attribution: googAttrib });
     var mapbox = L.tileLayer(mapboxUrl, { maxZoom: 22, attribution: mapboxAttrib });
+    //var oam = L.tileLayer(oamBelleviewUrl, {maxZoom: 22, minZoom: 15, attribution: oamAttrib });
+
+    // Open Aerial Map
+    const oamUrlArr = [
+        'https://tiles.openaerialmap.org/5bcf6b6a91037900144c3d6e/0/5bcf6b6a91037900144c3d9d/{z}/{x}/{y}',
+        'https://tiles.openaerialmap.org/5bcf6b6a91037900144c3d6e/0/5bcf6b6a91037900144c3dc3/{z}/{x}/{y}',
+        'https://tiles.openaerialmap.org/5bcf6b6a91037900144c3d6e/0/5bcf6b6a91037900144c3dc5/{z}/{x}/{y}',
+        'https://tiles.openaerialmap.org/5bcf6b9191037900144c3dd4/0/5bcf6b9191037900144c3dec/{z}/{x}/{y}',
+        'https://tiles.openaerialmap.org/5bcf6b9191037900144c3dd4/0/5bcf6b9191037900144c3dee/{z}/{x}/{y}',
+        'https://tiles.openaerialmap.org/5bcf6bb491037900144c3e3a/0/5bcf6bb491037900144c3e9d/{z}/{x}/{y}',
+        'https://tiles.openaerialmap.org/5bcf6bb491037900144c3e3a/0/5bcf6bb491037900144c3e9f/{z}/{x}/{y}',
+        'https://tiles.openaerialmap.org/5bcf6b6a91037900144c3d6e/0/5bcf6b6a91037900144c3dc0/{z}/{x}/{y}',
+        'https://tiles.openaerialmap.org/5bcf6b6a91037900144c3d6e/0/5bcf6b6a91037900144c3dc2/{z}/{x}/{y}',
+        'https://tiles.openaerialmap.org/5bcf6b9191037900144c3dd4/0/5bcf6b9191037900144c3de9/{z}/{x}/{y}',
+        'https://tiles.openaerialmap.org/5bcf6b9191037900144c3dd4/0/5bcf6b9191037900144c3deb/{z}/{x}/{y}',
+        'https://tiles.openaerialmap.org/5bcf6bb491037900144c3e3a/0/5bcf6bb491037900144c3e9a/{z}/{x}/{y}',
+        'https://tiles.openaerialmap.org/5bcf6bb491037900144c3e3a/0/5bcf6bb491037900144c3e9c/{z}/{x}/{y}',
+        'https://tiles.openaerialmap.org/5bcf6b6a91037900144c3d6e/0/5bcf6b6a91037900144c3d9b/{z}/{x}/{y}',
+        'https://tiles.openaerialmap.org/5bcf6b6a91037900144c3d6e/0/5bcf6b6a91037900144c3d75/{z}/{x}/{y}',
+        'https://tiles.openaerialmap.org/5bcf6b6a91037900144c3d6e/0/5bcf6b6a91037900144c3d9d/{z}/{x}/{y}',
+        'https://tiles.openaerialmap.org/5bcf6b6a91037900144c3d6e/0/5bcf6b6a91037900144c3d76/{z}/{x}/{y}',
+        'https://tiles.openaerialmap.org/5bcf6bd791037900144c3ea0/0/5bcf6bd791037900144c3ec2/{z}/{x}/{y}',
+        'https://tiles.openaerialmap.org/5bcf6bd791037900144c3ea0/0/5bcf6bd791037900144c3ec4/{z}/{x}/{y}',
+        'https://tiles.openaerialmap.org/5bcf6bd791037900144c3ea0/0/5bcf6bd791037900144c3ec5/{z}/{x}/{y}',
+        'https://tiles.openaerialmap.org/5bcf6bd791037900144c3ea0/0/5bcf6bd791037900144c3ee7/{z}/{x}/{y}',
+        'https://tiles.openaerialmap.org/5bcf6bd791037900144c3ea0/0/5bcf6bd791037900144c3ee6/{z}/{x}/{y}',
+        'https://tiles.openaerialmap.org/5bcf6bd791037900144c3ea0/0/5bcf6bd791037900144c3ee8/{z}/{x}/{y}',
+        'https://tiles.openaerialmap.org/5bcf6bd791037900144c3ea0/0/5bcf6bd791037900144c3efe/{z}/{x}/{y}',
+        'https://tiles.openaerialmap.org/5bcf6bd791037900144c3ea0/0/5bcf6bd791037900144c3ee9/{z}/{x}/{y}'
+    ];
+    const oamLayerArr = [];
+    for (const oamUrl of oamUrlArr) {
+        oamLayerArr.push(L.tileLayer(oamUrl, {maxZoom: 23, minZoom: 15, attribution: oamAttrib }));
+    }
+    const oam = L.layerGroup(oamLayerArr);
+
     const drawnItems = new L.FeatureGroup();
 
     const bsmList = [];  /* Array of timestamps/ BSM locations */
+
+    const baseMaps = {
+        'No Base Map': empty,       
+        'Google Hybrid': goog,
+        'Mapbox Satellite Streets': mapbox,     
+        'Open Street Map (zoom <= 19)': osm.addTo(map)   // Default added to map
+    };
+
+    const overlayMaps = {
+        'Open Aerial Map (zoom >= 15)': oam.addTo(map),  // Show by default
+        'Draw BSM Layer': drawnItems
+    };
    
 
-    var layerControl = L.control.layers({
-        'No Base Map': empty.addTo(map),
-        'Open Street Map': osm.addTo(map),
-        'Google Hybrid': goog.addTo(map),
-        'Mapbox Satellite Streets': mapbox.addTo(map)
-    }, {
-        'Draw BSM Layer': drawnItems
-    }, {
+    // var layerControl = L.control.layers({
+    //     'No Base Map': empty.addTo(map),       
+    //     'Google Hybrid': goog.addTo(map),
+    //     'Mapbox Satellite Streets': mapbox.addTo(map),     
+    //     'Open Street Map': osm.addTo(map)  
+    // }, {
+    //     'Open Aerial Map': oam.addTo(map),
+    //     'Draw BSM Layer': drawnItems
+    // }, {
+    //     positiion: 'topright', collapsed: false
+    // }).addTo(map);
+
+    var layerControl = L.control.layers(baseMaps, overlayMaps, {
         positiion: 'topright', collapsed: false
     }).addTo(map);
 
@@ -484,6 +540,8 @@
         console.log("uploadOdeMapJson");
         if (e?.files.length > 0) {
             let file = e.files[0];
+            console.log("MAP JSON File:");
+            console.log(file);
             file.text().then(
                 text => {
                     //const json = JSON.parse(text);
