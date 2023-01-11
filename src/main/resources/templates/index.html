@@ -38,7 +38,11 @@
                     <input type="file" id="btnTemplateUpload" accept=".json" onchange="uploadBsmTemplate(this);" />
                 </div>
                 <div>
-                    Upload MAP GeoJSON
+                    Upload ODE MAP JSON
+                    <input type="file" id="btnOdeMapJsonUpload" accept=".json,.csv" onchange="uploadOdeMapJson(this)"/>
+                </div>
+                <div>
+                    Upload ProcessdMap GeoJSON
                     <input type="file" id="btnMapUpload" accept=".geojson,.json" onchange="uploadMapGeojson(this);" />
                 </div>
                 <!-- <div>
@@ -191,7 +195,8 @@
         console.log("MAP Geojson:");
         console.log(mapGeojson);
         if (geojsonLayer) {
-            layerControl.removeOverlay(geojsonLayer);
+            map.removeLayer(geojsonLayer);
+            layerControl.removeLayer(geojsonLayer);
         }
         geojsonLayer = L.geoJSON(mapGeojson, {
             style: {
@@ -204,8 +209,11 @@
     }
 
     function setConnectingLanesGeojson(connectingGeojson) {
+        console.log("MAP Connections:");
+        console.log(connectingGeojson);
         if (connectingLayer) {
-            layerControl.removeOverlay(connectingLayer);
+            map.removeLayer(connectingLayer);
+            layerControl.removeLayer(connectingLayer);
         }
         connectingLayer = L.geoJSON(connectingGeojson, {
             style: {
@@ -470,6 +478,42 @@
                 setConnectingLanesGeojson(json.connectingLanesFeatureCollection);
             });
         }
+    }
+
+    function uploadOdeMapJson(e) {
+        console.log("uploadOdeMapJson");
+        if (e?.files.length > 0) {
+            let file = e.files[0];
+            file.text().then(
+                text => {
+                    //const json = JSON.parse(text);
+                    odeMapJsonToGeojsonAsync(text).then(
+                        response => response.json(), 
+                        failureCallback
+                    ).then(
+                        // Success callback
+                        json => {
+                            console.log(json);
+                            setMapGeojson(json.mapFeatureCollection);
+                            setConnectingLanesGeojson(json.connectingLanesFeatureCollection);
+                        },
+                        failureCallback
+                    );
+                
+                });
+        }
+    }
+
+    async function odeMapJsonToGeojsonAsync(json) {
+        const response = await fetch('/odeMapJsonToGeojson', {
+            method: 'POST',
+            cache: 'no-cache',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: json
+        });
+        return response;
     }
 
     // function addHeading(bsmArr) {

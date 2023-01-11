@@ -54,12 +54,33 @@ import us.dot.its.jpo.ode.plugin.j2735.J2735Bsm;
 import us.dot.its.jpo.ode.plugin.j2735.J2735BsmCoreData;
 import us.dot.its.jpo.ode.plugin.j2735.OdePosition3D;
 
+import us.dot.its.jpo.ode.model.OdeMapData;
+import us.dot.its.jpo.geojsonconverter.converter.map.MapProcessedJsonConverter;
+import us.dot.its.jpo.geojsonconverter.pojos.geojson.map.DeserializedRawMap;
+import us.dot.its.jpo.geojsonconverter.pojos.geojson.map.ProcessedMap;
+import us.dot.its.jpo.geojsonconverter.validator.JsonValidatorResult;
+
 @RestController
 public class TestController {
 
     private static final Logger logger = LoggerFactory.getLogger(TestController.class);
 
     ObjectMapper objectMapper = new ObjectMapper();
+
+    @PostMapping(value = "/odeMapJsonToGeojson", consumes = "application/json", produces = "*/*")
+    public @ResponseBody ResponseEntity<String> odeMapJsonToGeojson(@RequestBody OdeMapData odeMapData) {
+        try {
+            var processor = new MapProcessedJsonConverter();
+            var rawMap = new DeserializedRawMap();
+            rawMap.setOdeMapOdeMapData(odeMapData);
+            rawMap.setValidatorResults(new JsonValidatorResult());
+            var processedMap = processor.transform(null, rawMap).value;
+            return ResponseEntity.status(HttpStatus.OK).contentType(MediaType.APPLICATION_JSON).body(processedMap.toString());
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.OK).contentType(MediaType.TEXT_PLAIN)
+                .body(ExceptionUtils.getStackTrace(e));
+        }
+    }
 
     @PostMapping(value = "/spat", consumes = "application/json", produces = "*/*")
     public @ResponseBody ResponseEntity<String> spat(@RequestBody String json) {
