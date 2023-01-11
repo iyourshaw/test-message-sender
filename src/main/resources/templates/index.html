@@ -41,12 +41,21 @@
                     Upload ODE MAP JSON
                     <input type="file" id="btnOdeMapJsonUpload" accept=".json,.csv" onchange="uploadOdeMapJson(this)"/>
                 </div>
-                <div>
+                <!-- <div>
                     Upload ProcessdMap GeoJSON
                     <input type="file" id="btnMapUpload" accept=".geojson,.json" onchange="uploadMapGeojson(this);" />
-                </div>
-                <div>
+                </div> -->
+                <div id="mapControls">
+                    <hr/>
                     <button type="button" onclick="startSendingMap();">Start sending MAP</button>
+                    <button type="button" onclick="stopSendingMap();">Stop sending MAP</button>
+                    <br/>
+                    <input type="range" min="500" max="1500" value="1000" step="50" name="mapInterval" id="mapInterval" oninput="this.nextElementSibling.value = this.value" />
+                    <output>1000</output>
+                    <br/>
+                    <label for="mapInterval">MAP Interval (ms)</label>
+                    
+                    <hr/>
                 </div>
                 
             </div>
@@ -219,7 +228,7 @@
         //const response = await fetch('map_wadsworth_and_coalmine.geojson');
         const response = await fetch('MAP_wadsworth_and_coalmine.json');
         const mapJson = await response.json();
-        odeMapJsonToGeojson(text)
+        odeMapJsonToGeojson(JSON.stringify(mapJson));
         // setMapGeojson(mapJson.mapFeatureCollection);
         // setConnectingLanesGeojson(mapJson.connectingLanesFeatureCollection);
 
@@ -574,11 +583,25 @@
         return response;
     }
 
-    function startSendingMap(odeMap, intervalMs) {
+    var MAP_SEND = true;
+
+    function startSendingMap() {
+        MAP_SEND = true;
+        document.getElementById('mapControls').style = 'background-color:lightgreen';
+        var intervalMs = document.getElementById('mapInterval').value;
         setTimeout(function sendMapTimed() {
+            if (!MAP_SEND) return;
+            intervalMs = document.getElementById('mapInterval').value;
             const odeMap = buildMapFromTemplate(odeMapTemplate);
+            console.log("Sending MAP, next " + intervalMs);
             sendMapAsync(odeMap).then(successCallback, failureCallback);
+            setTimeout(sendMapTimed, intervalMs);
         }, intervalMs)
+    }
+
+    function stopSendingMap() {
+        MAP_SEND = false;
+        document.getElementById('mapControls').style = '';
     }
 
     async function sendMapAsync(odeMap) {
