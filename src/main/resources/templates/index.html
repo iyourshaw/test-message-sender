@@ -10,7 +10,7 @@
     <script src="https://unpkg.com/leaflet@1.9.3/dist/leaflet.js"
         integrity="sha256-WBkoXOwTeyKclOHuWtc+i2uENFpDZ9YPdf5Hf+D7ewM=" crossorigin=""></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet.draw/0.4.14/leaflet.draw.js"></script>
-    <!-- <script src='https://unpkg.com/@turf/turf@6/turf.min.js'></script> -->
+    <script src='https://unpkg.com/@turf/turf@6/turf.min.js'></script>
     <title>Test Message Sender</title>
 </head>
 
@@ -47,11 +47,11 @@
                         Upload ODE MAP JSON
                         <input type="file" id="btnOdeMapJsonUpload" accept=".json,.csv" onchange="uploadOdeMapJson(this)"/>
                     </div>
-                    <div>
+                    <!-- <div>
                         <hr/>
                         Upload ODE SPATs (line-delimited JSON)
                         <input type="file" accept=".jsonl,.ndjson,.csv,.json" onchange="uploadSpats(this);"/>
-                    </div>
+                    </div> -->
                 </div>
                 <hr/>
                 <div>
@@ -221,6 +221,24 @@
             var ts = Date.now();
             var bsm = { timestamp: ts, coords: [lon, lat], heading: 0, speed: 0 };
 
+            var prevBsm = bsmList.length > 1 ? bsmList[bsmList.length - 1] : null;
+            var prevCoords = prevBsm?.coords;
+            var prevTimestamp = prevBsm?.timestamp;
+            var prevMsgCnt = prevBsm?.msgCnt;
+            var msgCnt = prevMsgCnt != null ? (prevMsgCnt + 1) % 128 : 0;
+
+            // Get Origin IP and temp ID from template
+            const bsmTemplate = getCurrentBsmTemplate();
+            var originIp = bsmTemplate.metadata.originIp;
+            var id = bsmTemplate.payload.data.coreData.id;
+
+            let heading = 0;
+            let speed = 0;
+            if (prevCoords != null && prevTimestamp != null) {
+                [heading, speed] = getHeadingAndSpeed(prevCoords, [lon, lat], prevTimestamp, ts);
+            }
+            var bsm = { odeReceivedAt: ts, timestamp: ts, coords: [lon, lat], heading: 0, speed: 0, id: id, msgCnt: msgCnt, originIp: originIp };
+
             /* Tag the layer with the bsm timestamp so we can find it to update or delete */
             layer.bsmTimestamp = ts;
 
@@ -313,18 +331,20 @@
     getBsmTemplate();
 
     function sendBsms() {
-        var result = sendBsmsAsync().then(successCallback, failureCallback);
-        console.log("Sent BSMs with response");
-        console.log(result);
+        if (bsmList.length < 1) return;
+        console.log("sendBsms with no delay");
+        sendBsmListRealTime(bsmList, true);    // No delay
     }
 
     function sendBsmsRealTime() {
         if (bsmList.length < 1) return;
         console.log("sendBsmsRealTime");
-        sendBsmListRealTime(bsmList);
+        sendBsmListRealTime(bsmList, false);  // Calculate delay
     }
 
-    function sendBsmListRealTime(theBsmList) {
+    const MAX_DELAY = 5000;
+
+    function sendBsmListRealTime(theBsmList, noDelay) {
         BSM_SEND = true;
         document.getElementById('bsmControls').style = 'background-color:lightgreen';
 
@@ -356,23 +376,25 @@
                 ++idx;
                 const nextBsm = theBsmList[idx];
                 nextTime = nextBsm.odeReceivedAt - Date.now() - correctionOffset;
-                console.log(nextTime);
+                
                 if (nextTime < 0) {
                     nextTime = 0;
-                    if (nextTime < -500) {
+                    if (nextTime < -MAX_DELAY) {
                         correctionOffset = 0;
                     }
                 }
                
-                if (nextTime > 500) {
-                    correctionOffset = nextTime - 500;
-                    nextTime = 500;
+                if (nextTime > MAX_DELAY) {
+                    correctionOffset = nextTime - MAX_DELAY;
+                    nextTime = MAX_DELAY;
                     //offset = Date.now() - nextBsm.odeReceivedAt;
                 }
+                nextTime = noDelay ? 0 : nextTime;
                 console.log("Sending BSM id = " + id + " in " + nextTime + " ms");
-                setTimeout(sendBsmTimed, nextTime);
+                setTimeout(sendBsmTimed, noDelay ? 0 : nextTime);
             } else {
                 console.log("Completed Sending BSMs with id = " + id);
+                stopSendingBsms();
             }
         }, nextTime);
     }
@@ -419,33 +441,11 @@
         return response;
     }
 
-    async function sendBsmsAsync() {
-        let postData = prepareBsmPostData();
-        const response = await fetch('/createBsmMessages', {
-            method: 'POST',
-            cache: 'no-cache',
-            headers: {
-                'Content-Type': 'application/json'
-            },
-            body: JSON.stringify(postData)
-        });
-        return response;
-    }
-
-
-
-
-
-    function prepareBsmPostData() {
-        console.log(bsmList);
-        // Calculate bearing and speed
-        //addHeading(bsmList);
-        console.log(bsmList);
-        // If there is a BSM template, attach it
-        const bsmTemplateObj = getCurrentBsmTemplate();
-        const postData = { bsmList: bsmList, bsmTemplate: bsmTemplateObj };
-        return postData;
-    }
+    
+    
+    
+    
+ 
 
     function getCurrentBsmTemplate() {
         let bsmTemplateObj = null;
@@ -652,6 +652,16 @@
     function buildMapFromTemplate() {
         // TODO set timestamp
         return odeMapTemplate;
+    }
+
+    function getHeadingAndSpeed(coords1, coords2, millis1, millis2) {
+        var point1 = turf.point(coords1);
+        var point2 = turf.point(coords2);
+        var heading = turf.bearingToAzimuth(turf.bearing(point1, point2));
+        var distanceMeters = turf.distance(point1, point2, { units: 'kilometers' }) * 1000;
+        var tSeconds = (millis2 - millis1) / 1000;
+        var speed = distanceMeters / tSeconds;
+        return [heading, speed];
     }
 
     // function addHeading(bsmArr) {

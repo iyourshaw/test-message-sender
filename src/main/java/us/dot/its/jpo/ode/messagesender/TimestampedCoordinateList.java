@@ -1,7 +1,7 @@
-package us.dot.its.jpo.ode.messagesender;
+// package us.dot.its.jpo.ode.messagesender;
 
-import java.util.ArrayList;
+// import java.util.ArrayList;
 
-public class TimestampedCoordinateList extends ArrayList<TimestampedCoordinate> {
+// public class TimestampedCoordinateList extends ArrayList<TimestampedCoordinate> {
     
-}
+// }
