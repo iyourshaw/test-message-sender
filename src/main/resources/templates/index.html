@@ -221,11 +221,11 @@
             var ts = Date.now();
             var bsm = { timestamp: ts, coords: [lon, lat], heading: 0, speed: 0 };
 
-            var prevBsm = bsmList.length > 1 ? bsmList[bsmList.length - 1] : null;
+            var prevBsm = bsmList.length > 0 ? bsmList[bsmList.length - 1] : null;
             var prevCoords = prevBsm?.coords;
             var prevTimestamp = prevBsm?.timestamp;
-            var prevMsgCnt = prevBsm?.msgCnt;
-            var msgCnt = prevMsgCnt != null ? (prevMsgCnt + 1) % 128 : 0;
+            var prevMsgCnt = prevBsm != null ? prevBsm.msgCnt : 0;
+            var msgCnt = (prevMsgCnt + 1) % 128;
 
             // Get Origin IP and temp ID from template
             const bsmTemplate = getCurrentBsmTemplate();
@@ -236,8 +236,10 @@
             let speed = 0;
             if (prevCoords != null && prevTimestamp != null) {
                 [heading, speed] = getHeadingAndSpeed(prevCoords, [lon, lat], prevTimestamp, ts);
+                heading = Math.round(heading * 10) / 10;
+                speed = Math.round(speed * 100) / 100;
             }
-            var bsm = { odeReceivedAt: ts, timestamp: ts, coords: [lon, lat], heading: 0, speed: 0, id: id, msgCnt: msgCnt, originIp: originIp };
+            var bsm = { odeReceivedAt: ts, timestamp: ts, coords: [lon, lat], heading: heading, speed: speed, id: id, msgCnt: msgCnt, originIp: originIp };
 
             /* Tag the layer with the bsm timestamp so we can find it to update or delete */
             layer.bsmTimestamp = ts;
@@ -678,35 +680,27 @@
         return [heading, speed];
     }
 
-    // function addHeading(bsmArr) {
-    //     if (bsmArr.length <= 1) {
-    //         return;
-    //     }
+    function downloadText(filename, text) {
+        var e = document.createElement('a');
+        e.setAttribute('href', 'data:text/plain;charset=utf-8,' + encodeURIComponent(text));
+        e.setAttribute('download', filename);
+        e.style.display = 'none';
+        document.body.appendChild(e);
+        e.click();
+        document.body.removeChild(e);
+    }
 
-    //     for (var i = 1; i < bsmArr.length; i++) {
-    //         // Bearing and speed based on the previous point
-    //         var point1 = turf.point(bsmArr[i - 1].coords);
-    //         var point2 = turf.point(bsmArr[i].coords);
-    //         var heading = turf.bearingToAzimuth(turf.bearing(point1, point2));
+    function downloadBsms() {
+        let ldjson = '';
+        const bsmTemplate = getCurrentBsmTemplate();
+        for (const bsm of bsmList) {
+            const postDataItem = buildBsmFromTemplate(bsm, bsmTemplate);
+            ldjson += JSON.stringify(postDataItem) + '\n';
+        }
+        downloadText('BSMData.jsonl', ldjson);
+    }
 
-    //         var distanceMeters = turf.distance(point1, point2, { units: 'kilometers' }) * 1000;
-
-    //         var t1 = bsmArr[i - 1].timestamp;
-    //         var t2 = bsmArr[i].timestamp;
-    //         var tSeconds = (t2 - t1) / 1000;
-    //         var speed = distanceMeters / tSeconds;
-
-    //         bsmArr[i].heading = heading;
-    //         bsmArr[i].speed = speed;
-    //         if (i == 1) {
-    //             // First point same as second
-    //             bsmArr[0].heading = heading;
-    //             bsmArr[0].speed = speed;
-    //         }
-    //     }
-
-
-    // }
+    
 
 
 
