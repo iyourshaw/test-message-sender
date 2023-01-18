@@ -243,7 +243,7 @@
             layer.bsmTimestamp = ts;
 
             bsmList.push(bsm);
-            console.log(bsmList);
+            //console.log(bsmList);
 
             /* Keep circlemarker button in edit mode
                TODO Figure out some way to do this other than this hack */
@@ -304,7 +304,8 @@
                 color: '#f0f',
                 width: '1px',
                 opacity: 1
-            }
+            },
+            onEachFeature: addPropertiesTooltip
         }).addTo(map);
         layerControl.addOverlay(geojsonLayer, 'MAP Geojson');
     }
@@ -321,9 +322,22 @@
                 color: '#0f0',
                 width: '1px',
                 opacity: 1
-            }
+            },
+            onEachFeature: addPropertiesTooltip
         }).addTo(map);
         layerControl.addOverlay(connectingLayer, "Connections");
+    }
+
+    function addPropertiesTooltip(feature, layer) {
+        let popupContent = '';
+        for (const key in feature.properties) {
+            const val = feature.properties[key];
+            // Include booleans and numbers
+            if (typeof val == 'boolean' || !isNaN(val)) {
+                popupContent += key + ' = ' + val + '<br/>';
+            }
+        }
+        layer.bindPopup(popupContent);
     }
 
 
