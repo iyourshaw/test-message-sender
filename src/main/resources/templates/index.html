@@ -16,55 +16,81 @@
 
 <body>
     <div class="container">
-        <div id="map">
-        </div>
         <div class="side">
-            <div class="sideItem">
-                <div>
-                    <button type="button" onclick="sendBsms();">Send BSMs to Kafka Topic</button>
-                </div>
-                <div>
-                    <button type="buttom" onclick="sendBsmsRealTime();">Send BSMs to Kafka Topic (Real Time)</button>
-                </div>
-                <div>
-                    <button type="button" onclick="downloadBsms();">Download BSMs (line-delimited JSON)</button>
-                </div>
-                <div>
-                    Upload BSMs (line-delimited JSON)
-                    <input type="file" accept=".jsonl,.ndjson,.csv,.json" onchange="uploadBsms(this);" />
-                </div>
-                <div>
-                    Upload BSM template
-                    <input type="file" id="btnTemplateUpload" accept=".json" onchange="uploadBsmTemplate(this);" />
-                </div>
-                <div>
-                    Upload ODE MAP JSON
-                    <input type="file" id="btnOdeMapJsonUpload" accept=".json,.csv" onchange="uploadOdeMapJson(this)"/>
-                </div>
-                <!-- <div>
-                    Upload ProcessdMap GeoJSON
-                    <input type="file" id="btnMapUpload" accept=".geojson,.json" onchange="uploadMapGeojson(this);" />
-                </div> -->
-                <div id="mapControls">
-                    <hr/>
-                    <button type="button" onclick="startSendingMap();">Start sending MAP</button>
-                    <button type="button" onclick="stopSendingMap();">Stop sending MAP</button>
-                    <br/>
-                    <input type="range" min="500" max="1500" value="1000" step="50" name="mapInterval" id="mapInterval" oninput="this.nextElementSibling.value = this.value" />
-                    <output>1000</output>
-                    <br/>
-                    <label for="mapInterval">MAP Interval (ms)</label>
-                    
-                    <hr/>
-                </div>
-                
-            </div>
             <div class="sideItem">
                 BSM Template
             </div>
             <div class="sideItem jsonDocument" id="bsmTemplate" contenteditable="true" spellcheck="false">
 
             </div>
+        </div>
+        <div id="map">
+        </div>
+        <div class="side">
+            <div class="sideItem">
+                
+                
+                <div>
+                    <h2>Upload</h2>
+                    <div>
+                        <hr/>
+                        Upload BSMs (line-delimited JSON)
+                        <input type="file" accept=".jsonl,.ndjson,.csv,.json" onchange="uploadBsms(this);" />
+                    </div>
+                    <div>
+                        <hr/>
+                        Upload BSM template
+                        <input type="file" id="btnTemplateUpload" accept=".json" onchange="uploadBsmTemplate(this);" />
+                    </div>
+                    <div>
+                        <hr/>
+                        Upload ODE MAP JSON
+                        <input type="file" id="btnOdeMapJsonUpload" accept=".json,.csv" onchange="uploadOdeMapJson(this)"/>
+                    </div>
+                    <div>
+                        <hr/>
+                        Upload ODE SPATs (line-delimited JSON)
+                        <input type="file" accept=".jsonl,.ndjson,.csv,.json" onchange="uploadSpats(this);"/>
+                    </div>
+                </div>
+                <hr/>
+                <div>
+                    <h2>Send</h2>
+                    
+
+                    <div id="mapControls">
+                        <hr/>
+                        <button type="button" onclick="startSendingMap();">Start sending MAP</button>
+                        <button type="button" onclick="stopSendingMap();">Stop sending MAP</button>
+                        <br/>
+                        <input type="range" min="500" max="1500" value="1000" step="50" name="mapInterval" id="mapInterval" oninput="this.nextElementSibling.value = this.value" />
+                        <output>1000</output>
+                        <br/>
+                        <label for="mapInterval">MAP Interval (ms)</label>
+                        
+                        <hr/>
+                    </div>
+                   
+                    <div id="bsmControls">
+                        <hr/>
+                        <button type="buttom" onclick="sendBsmsRealTime();">Send BSMs (Real Time)</button>
+                        <button type="button" onclick="stopSendingBsms();">Stop Sending BSMs</button>
+                    </div>
+                    <div>
+                        <hr/>
+                        <button type="button" onclick="sendBsms();">Send BSMs (All at once)</button>
+                    </div>
+                </div>
+                <hr/>
+                <div>
+                    <h2>Download</h2>
+                    <div>
+                        <button type="button" onclick="downloadBsms();">Download BSMs (line-delimited JSON)</button>
+                    </div>
+                </div>
+                <hr/>
+            </div>
+           
         </div>
     </div>
 </body>
@@ -299,6 +325,8 @@
     }
 
     function sendBsmListRealTime(theBsmList) {
+        BSM_SEND = true;
+        document.getElementById('bsmControls').style = 'background-color:lightgreen';
 
         // Set the timestamps to start 500 ms from now
         const startIn = 500;
@@ -319,13 +347,8 @@
         console.log("Sending BSM in " + nextTime + " ms");
         let correctionOffset = 0;
         setTimeout(function sendBsmTimed() {
+            if (!BSM_SEND) return;
             const bsm = theBsmList[idx];
-            // bsm.timestamp += offset;
-            // bsm.odeReceivedAt += offset;
-            // let ts = new Date(bsm.timestamp);
-            // let ora = new Date(bsm.odeReceivedAt);
-            // console.log(ts);
-            // console.log(ora);
             const id = bsm.id;
             const postDataItem = buildBsmFromTemplate(bsm, bsmTemplate);
             sendBsmAsync(postDataItem).then(successCallback, failureCallback);
@@ -352,6 +375,13 @@
                 console.log("Completed Sending BSMs with id = " + id);
             }
         }, nextTime);
+    }
+
+    var BSM_SEND = true;
+
+    function stopSendingBsms() {
+        BSM_SEND = false;
+        document.getElementById('bsmControls').style = '';
     }
 
     function buildBsmFromTemplate(bsm, bsmTemplate) {
@@ -449,6 +479,10 @@
                 // Clear exising bsms
                 bsmList.length = 0;
                 const lines = text.split(/\r?\n/);
+                
+                // Set the first BSM as the template
+                setBsmTemplate(lines[0]);
+
                 for (const line of lines) {
                     if (line) {
                         const json = JSON.parse(line);
