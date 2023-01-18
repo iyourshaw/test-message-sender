@@ -666,8 +666,10 @@
     }
 
     function buildMapFromTemplate() {
-        // TODO set timestamp
-        return odeMapTemplate;
+        let mapCopy = JSON.parse(JSON.stringify(odeMapTemplate));
+        const nowMillis = Date.now();
+        mapCopy.metadata.odeReceivedAt = new Date(nowMillis).toISOString();
+        return mapCopy;
     }
 
     function getHeadingAndSpeed(coords1, coords2, millis1, millis2) {
