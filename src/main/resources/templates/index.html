@@ -428,8 +428,12 @@
         const bsmObj = JSON.parse(bsmJson);
         bsmObj.payload.data.coreData.id = bsm.id;
         bsmObj.payload.data.coreData.msgCnt = bsm.msgCnt;
-        bsmObj.payload.data.coreData.speed = bsm.speed;
-        bsmObj.payload.data.coreData.heading = bsm.heading;
+        if (bsm.speed > 0) {
+            bsmObj.payload.data.coreData.speed = bsm.speed;
+        }
+        if (bsm.heading > 0) {
+            bsmObj.payload.data.coreData.heading = bsm.heading;
+        }
         bsmObj.payload.data.coreData.position.longitude = bsm.coords[0];
         bsmObj.payload.data.coreData.position.latitude = bsm.coords[1];
         const dt = new Date(bsm.timestamp);
