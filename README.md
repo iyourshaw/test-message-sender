@@ -6,8 +6,10 @@ This is a UI that can send test BSM JSON messages to the Conflict Monitor using 
 
 Copy the file `src/main/resources/application.properties.example` to a new file named `application.properties` in the same directory.
 
-Fill in the property `mapbox.tile.endpoint` with a Mabox WMTS tile endpoint (obtained from Mapbox Studio > Styles > Share... > Developer Resources > Third party > Integration URL).
-
+Fill in the property `mapbox.tile.endpoint` with a Mabox tile endpoint (obtained from Mapbox Studio > Styles > Share... > Developer Resources > Third party > Integration URL) with the following format:
+```
+https://api.mapbox.com/styles/v1/[USERNAME]/[STYLEID]/tiles/{z}/{x}/{y}?access_token=[ACCESSTOKEN]
+```
 ## Prerequesites
 * USDOT ODE
 * USDOT ODE Geojson Converter
