@@ -24,7 +24,7 @@ $ mvn clean install
 
 from the base jpo-ode directory to make the ODE libraries available in the local maven repository.
 
-3) Run the ODE in Docker according the the instructions at [ODE Installation](https://github.com/usdot-jpo-ode/jpo-ode#installation):
+3) Run the ODE in Docker according to the instructions at [ODE Installation](https://github.com/usdot-jpo-ode/jpo-ode#installation):
 ```bash
 $ docker-compose up --build -d
 ```
