@@ -9,8 +9,12 @@ Copy the file `src/main/resources/application.properties.example` to a new file 
 Fill in the property `mapbox.tile.endpoint` with a Mabox WMTS tile endpoint (obtained from Mapbox Studio > Styles > Share... > Developer Resources > Third party > Integration URL).
 
 ## Prerequesites
+* USDOT ODE
+* USDOT ODE Geojson Converter
 
-1) Download the ODE source code from [USTOT JPO ODE](https://github.com/usdot-jpo-ode/jpo-ode)
+### ODE
+
+1) Download the ODE source code from [USDOT JPO ODE](https://github.com/usdot-jpo-ode/jpo-ode)
 
 2) Build the ODE libraries. Run:
 
@@ -20,8 +24,24 @@ $ mvn clean install
 
 from the base jpo-ode directory to make the ODE libraries available in the local maven repository.
 
-3) Run the ODE in Docker according the the instructions at [ODE Installation](https://github.com/usdot-jpo-ode/jpo-ode#installation).  
+3) Run the ODE in Docker according the the instructions at [ODE Installation](https://github.com/usdot-jpo-ode/jpo-ode#installation):
+```bash
+$ docker-compose up --build -d
+```
 
+### ODE Geojson Converter
+
+1) Download the ODE Geojson converter from [USDOT JPO ODE Geojsonconverter](https://github.com/usdot-jpo-ode/jpo-geojsonconverter) according to the instructions on that site.
+2) Check out the `develop` branch
+3) Build the geojson converter libraries.  Run:
+```bash
+$ mvn clean install
+```
+from the jpo-geojsonconverter directory to install the geojson converter library in the local mave repository.
+3) Run the Geojson converter in Docker via:
+```bash
+$ docker-compose up --build -d
+```
 
 ## Compile and Run
 
