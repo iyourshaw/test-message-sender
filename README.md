@@ -38,7 +38,8 @@ $ docker-compose up --build -d
 $ mvn clean install
 ```
 from the jpo-geojsonconverter directory to install the geojson converter library in the local mave repository.
-3) Run the Geojson converter in Docker via:
+
+4) Run the Geojson converter in Docker via:
 ```bash
 $ docker-compose up --build -d
 ```
