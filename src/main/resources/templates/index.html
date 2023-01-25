@@ -21,7 +21,7 @@
             <div class="sideItem jsonDocument" id="bsmTemplate" contenteditable="true" spellcheck="false">
             </div>
             <h3 class="sideItem">SPAT Template</h3>
-            <div class="sideItem jsonDocument" id="spatTemplate1" contenteditable="true" spellcheck="false">
+            <div class="sideItem jsonDocument" id="spatTemplate" contenteditable="true" spellcheck="false">
                 Spat document
             </div>
         </div>
@@ -41,11 +41,11 @@
                         Upload BSMs (line-delimited JSON)
                         <input type="file" accept=".jsonl,.ndjson,.csv,.txt" onchange="uploadBsms(this);" />
                     </div>
-                    <div>
+                    <!-- <div>
                         <hr />
                         Upload BSM template
                         <input type="file" id="btnTemplateUpload" accept=".json" onchange="uploadBsmTemplate(this);" />
-                    </div>
+                    </div> -->
                     <div>
                         <hr />
                         Upload MAP JSON
@@ -175,7 +175,8 @@
 
     const drawnItems = new L.FeatureGroup();
 
-    const bsmList = [];  /* Array of timestamps/ BSM locations */
+    const bsmList = [];  /* Array of BSM locations */
+    const spatList = [];
 
     const baseMaps = {
         'No Base Map': empty,
@@ -308,7 +309,7 @@
 
     function setBsmTemplate(text) {
         var json = JSON.parse(text);
-        document.getElementById("bsmTemplate").innerText = JSON.stringify(json, null, 2);
+        document.getElementById("bsmTemplate").innerText = JSON.stringify(json, null, 1);
     }
 
     let geojsonLayer = undefined;
@@ -727,7 +728,83 @@
     }
 
 
+    // ------------------------- SPAT Upload --------------------------------
+    function uploadSpats(e) {
+        console.log("uploadSpats");
+        if (e?.files.length > 0) {
+            let file = e.files[0];
+            file.text().then(text => {
+                // Clear existing spats
+                spatList.length = 0;
+                const lines = text.split(/\r?\n/);
+                console.log("Read " + lines.length + " from spat file");
 
+                // Set the first SPAT as the template
+                setSpatTemplate(lines[0])
+                for (const line of lines) {
+                    if (line) {
+                        const json = JSON.parse(line);
+                        const spat = extractSpatData(json);
+                        spatList.push(spat);
+                    }
+                }
+
+                console.log("Uploaded " + spatList.length + " SPATs");
+            })
+        }
+    }
+
+    function setSpatTemplate(text) {
+        const json = JSON.parse(text);
+        document.getElementById("spatTemplate").innerText = JSON.stringify(json, null, 1);
+    }
+
+    function extractSpatData(json) {
+        const metadata = json?.metadata;
+        const dtReceivedAtMillis = Date.parse(metadata.odeReceivedAt);
+        const payload = json.payload;
+        const data = payload.data;
+        const isl = data.intersectionStateList;
+        const isl2 = isl.intersectionStatelist;
+        const intersection = isl2[0];
+        const region = intersection.id?.region;
+        const revision = intersection.revision;
+        const intersectionId = intersection.id?.id;
+        const moy = intersection.moy;
+        const timestamp = intersection.timeStamp;
+        const movementList = intersection.states?.movementList;
+        
+        const events = [];
+
+        
+        for (movement of movementList) {
+            const signalGroup = movement.signalGroup;
+            const eventList = movement.state_time_speed?.movementEventList;
+            // Assume 1 event
+            let eventState;
+            let minEndTime;
+            let maxEndTime;
+            for (const event of eventList) {
+                eventState = event.eventState;
+                minEndTime = event?.timing?.minEndTime;
+                maxEndTime = event?.timing?.maxEndTime;
+            }
+            events.push({
+                signalGroup: signalGroup,
+                eventState: eventState,
+                minEndTime: minEndTime,
+                maxEndTime: maxEndTime
+            });
+            
+        }
+
+        const spat = { odeReceivedAt: dtReceivedAtMillis, 
+            region: region, intersectionId: intersectionId, 
+            moy: moy, timestamp: timestamp,
+            events: events}
+        console.log(spat);
+        return spat;
+    }
 
 
 
