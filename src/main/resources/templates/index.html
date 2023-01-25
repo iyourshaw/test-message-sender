@@ -17,80 +17,100 @@
 <body>
     <div class="container">
         <div class="side">
-            <div class="sideItem">
-                BSM Template
-            </div>
+            <h3 class="sideItem">BSM Template</h3>
             <div class="sideItem jsonDocument" id="bsmTemplate" contenteditable="true" spellcheck="false">
-
+            </div>
+            <h3 class="sideItem">SPAT Template</h3>
+            <div class="sideItem jsonDocument" id="spatTemplate1" contenteditable="true" spellcheck="false">
+                Spat document
             </div>
         </div>
+
+
         <div id="map">
         </div>
         <div class="side">
             <div class="sideItem">
-                
-                
+
+
                 <div>
-                    <h2>Upload</h2>
+                    <h3>Upload ODE Json</h3>
+                    <p>(OdeMapData, OdeSpatData, OdeBsmData formats)</p>
                     <div>
-                        <hr/>
+                        <hr />
                         Upload BSMs (line-delimited JSON)
-                        <input type="file" accept=".jsonl,.ndjson,.csv,.json" onchange="uploadBsms(this);" />
+                        <input type="file" accept=".jsonl,.ndjson,.csv,.txt" onchange="uploadBsms(this);" />
                     </div>
                     <div>
-                        <hr/>
+                        <hr />
                         Upload BSM template
                         <input type="file" id="btnTemplateUpload" accept=".json" onchange="uploadBsmTemplate(this);" />
                     </div>
                     <div>
-                        <hr/>
-                        Upload ODE MAP JSON
-                        <input type="file" id="btnOdeMapJsonUpload" accept=".json,.csv,.jsonl,.ndjson" onchange="uploadOdeMapJson(this)"/>
+                        <hr />
+                        Upload MAP JSON
+                        <input type="file" id="btnOdeMapJsonUpload" accept=".json,.csv,.jsonl,.ndjson"
+                            onchange="uploadOdeMapJson(this);" />
                     </div>
-                    <!-- <div>
-                        <hr/>
-                        Upload ODE SPATs (line-delimited JSON)
-                        <input type="file" accept=".jsonl,.ndjson,.csv,.json" onchange="uploadSpats(this);"/>
-                    </div> -->
+                    <div>
+                        <hr />
+                        Upload SPATs (line-delimited JSON)
+                        <input type="file" accept=".jsonl,.ndjson,.csv" onchange="uploadSpats(this);" />
+                    </div>
                 </div>
-                <hr/>
+                <hr />
                 <div>
-                    <h2>Send</h2>
-                    
+                    <h3>Send</h3>
+
 
                     <div id="mapControls">
-                        <hr/>
+                        <hr />
                         <button type="button" onclick="startSendingMap();">Start sending MAP</button>
                         <button type="button" onclick="stopSendingMap();">Stop sending MAP</button>
-                        <br/>
-                        <input type="range" min="500" max="1500" value="1000" step="50" name="mapInterval" id="mapInterval" oninput="this.nextElementSibling.value = this.value" />
+                        <br />
+                        <input type="range" min="500" max="1500" value="1000" step="50" name="mapInterval"
+                            id="mapInterval" oninput="this.nextElementSibling.value = this.value" />
                         <output>1000</output>
-                        <br/>
+                        <br />
                         <label for="mapInterval">MAP Interval (ms)</label>
-                        
-                        <hr/>
+
                     </div>
-                   
+
+                    <div id="spatControls">
+                        <hr />
+                        <button type="button" onclick="startSendingSpat();">Start sending SPAT</button>
+                        <button type="button" onclick="stopSendingSpat();">Stop sending SPAT</button>
+                        <br />
+                        <input type="range" min="50" max="150" value="100" step="5" name="spatInterval"
+                            id="spatInterval" oninput="this.nextElementSibling.value = this.value" />
+                        <output>100</output>
+                        <br />
+                        <label for="spatInterval">SPAT Interval (ms)</label>
+                        <hr />
+                        <button type="button" onclick="sendSpats();">Send SPATs (Real Time)</button>
+                        <button type="button" onclick="stopSendingSpats();">Stop Sending Spats</button>
+                    </div>
+
                     <div id="bsmControls">
-                        <hr/>
+                        <hr />
                         <button type="buttom" onclick="sendBsmsRealTime();">Send BSMs (Real Time)</button>
                         <button type="button" onclick="stopSendingBsms();">Stop Sending BSMs</button>
                     </div>
                     <div>
-                        <hr/>
+                        <hr />
                         <button type="button" onclick="sendBsms();">Send BSMs (All at once)</button>
                     </div>
                 </div>
-                <hr/>
+                <hr />
                 <div>
                     <h2>Download</h2>
                     <div>
                         <button type="button" onclick="downloadBsms();">Download BSMs (line-delimited JSON)</button>
                     </div>
                 </div>
-                <hr/>
+                <hr />
             </div>
-           
+
         </div>
     </div>
 </body>
@@ -104,7 +124,7 @@
     var googUrl = 'https://mt1.google.com/vt/lyrs=y&x={x}&y={y}&z={z}';
     var googAttrib = 'Google Maps';
 
-    
+
     var oamAttrib = '<a href="http://openaerialmap.org/about/" target="_blank">Open Aerial Map</a>';
 
     /* See https://www.thymeleaf.org/doc/tutorials/3.0/usingthymeleaf.html#javascript-inlining */
@@ -116,7 +136,7 @@
     var osm = L.tileLayer(osmUrl, { maxZoom: 19, attribution: osmAttrib });
     var goog = L.tileLayer(googUrl, { maxZoom: 22, attribution: googAttrib });
     var mapbox = L.tileLayer(mapboxUrl, { maxZoom: 22, attribution: mapboxAttrib });
-    
+
 
     // Open Aerial Map
     const oamUrlArr = [
@@ -149,7 +169,7 @@
     ];
     const oamLayerArr = [];
     for (const oamUrl of oamUrlArr) {
-        oamLayerArr.push(L.tileLayer(oamUrl, {maxZoom: 23, minZoom: 15, attribution: oamAttrib }));
+        oamLayerArr.push(L.tileLayer(oamUrl, { maxZoom: 23, minZoom: 15, attribution: oamAttrib }));
     }
     const oam = L.layerGroup(oamLayerArr);
 
@@ -158,9 +178,9 @@
     const bsmList = [];  /* Array of timestamps/ BSM locations */
 
     const baseMaps = {
-        'No Base Map': empty,       
+        'No Base Map': empty,
         'Google Hybrid': goog,
-        'Mapbox Satellite Streets': mapbox,     
+        'Mapbox Satellite Streets': mapbox,
         'Open Street Map (zoom <= 19)': osm.addTo(map)   // Default added to map
     };
 
@@ -168,9 +188,9 @@
         'Open Aerial Map (zoom >= 15)': oam.addTo(map),  // Show by default
         'Draw BSM Layer': drawnItems
     };
-   
 
-   
+
+
     var layerControl = L.control.layers(baseMaps, overlayMaps, {
         positiion: 'topright', collapsed: false
     }).addTo(map);
@@ -334,12 +354,12 @@
         let popupContent = '';
         for (const key in feature.properties) {
             const val = feature.properties[key];
-            // Include booleans and numbers
-            if (typeof val == 'boolean' || !isNaN(val)) {
+            // Include numbers only
+            if (typeof val != 'boolean' && !isNaN(val)) {
                 popupContent += key + ' = ' + val + '<br/>';
             }
         }
-        layer.bindPopup(popupContent);
+        layer.bindPopup(popupContent, { autoClose: false, closeOnClick: false });
     }
 
 
@@ -392,14 +412,14 @@
                 ++idx;
                 const nextBsm = theBsmList[idx];
                 nextTime = nextBsm.odeReceivedAt - Date.now() - correctionOffset;
-                
+
                 if (nextTime < 0) {
                     nextTime = 0;
                     if (nextTime < -MAX_DELAY) {
                         correctionOffset = 0;
                     }
                 }
-               
+
                 if (nextTime > MAX_DELAY) {
                     correctionOffset = nextTime - MAX_DELAY;
                     nextTime = MAX_DELAY;
@@ -444,7 +464,7 @@
         bsmObj.payload.data.coreData.secMark = millis;
         bsmObj.metadata.originIp = bsm.originIp;
 
-        
+
         bsmObj.metadata.odeReceivedAt = new Date(bsm.odeReceivedAt).toISOString();
         return bsmObj;
     }
@@ -461,11 +481,11 @@
         return response;
     }
 
-    
-    
-    
-    
- 
+
+
+
+
+
 
     function getCurrentBsmTemplate() {
         let bsmTemplateObj = null;
@@ -499,7 +519,7 @@
                 // Clear exising bsms
                 bsmList.length = 0;
                 const lines = text.split(/\r?\n/);
-                
+
                 // Set the first BSM as the template
                 setBsmTemplate(lines[0]);
 
@@ -612,7 +632,7 @@
     function odeMapJsonToGeojson(text) {
         odeMapTemplate = JSON.parse(text);
         odeMapJsonToGeojsonAsync(text).then(
-            response => response.json(), 
+            response => response.json(),
             failureCallback
         ).then(
             // Success callback
@@ -706,7 +726,7 @@
         downloadText('BSMData.jsonl', ldjson);
     }
 
-    
+
 
 
 
