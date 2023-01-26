@@ -46,10 +46,10 @@
 
 
                 <div>
-                    <h3>Upload ODE Json</h3>
+                    
                     <div>
                         <hr />
-                        Upload BSMs (line-delimited JSON)
+                        <h3>Upload BSMs (line-delimited JSON)</h3>
                         <input type="file" accept=".jsonl,.ndjson,.csv,.txt" onchange="uploadBsms(this);" />
                     </div>
                     <!-- <div>
@@ -59,68 +59,70 @@
                     </div> -->
                     <div>
                         <hr />
-                        Upload MAP JSON
+                        <h3>Upload MAP JSON</h3>
                         <input type="file" id="btnOdeMapJsonUpload" accept=".json,.csv,.jsonl,.ndjson"
                             onchange="uploadOdeMapJson(this);" />
                     </div>
                     <div>
                         <hr />
-                        Upload SPATs (line-delimited JSON)
+                        <h3>Upload SPATs (line-delimited JSON)</h3>
                         <input type="file" accept=".jsonl,.ndjson,.csv" onchange="uploadSpats(this);" />
                         
                     </div>
                 </div>
                 <hr />
-                <div>
+                
                     
 
-                    <hr />
-                    <div id="mapControls">
-                        
-                        <h3>Send MAP</h3>
-                        <button type="button" onclick="startSendingMap();">Start sending MAP</button>
-                        <button type="button" onclick="stopSendingMap();">Stop sending MAP</button>
-                        <br />
-                        <input type="range" min="500" max="1500" value="1000" step="50" name="mapInterval"
-                            id="mapInterval" oninput="this.nextElementSibling.value = this.value" />
-                        <output>1000</output>
-                        <br />
-                        <label for="mapInterval">MAP Interval (ms)</label>
+                    
+                <div id="mapControls">
+                    
+                    <h3>Send MAP</h3>
+                    <button type="button" onclick="startSendingMap();">Start</button>
+                    <button type="button" onclick="stopSendingMap();">Stop</button>
+                    <br />
+                    <input type="range" min="500" max="1500" value="1000" step="50" name="mapInterval"
+                        id="mapInterval" oninput="this.nextElementSibling.value = this.value" />
+                    <output>1000</output>
+                    <br />
+                    <label for="mapInterval">MAP Interval (ms)</label>
 
-                    </div>
-                    <hr />
-                    <div id="spatControls">
-                        
-                        <h3>Send Selected SPATs</h3>
-                        <button type="button" onclick="startSendingSpat();">Start sending SPATs</button>
-                        <button type="button" onclick="stopSendingSpat();">Stop sending SPATs</button>
-                        <br />
-                        <input type="range" min="50" max="150" value="100" step="5" name="spatInterval"
-                            id="spatInterval" oninput="this.nextElementSibling.value = this.value" />
-                        <output>100</output>
-                        <br />
-                        <label for="spatInterval">SPAT Interval (ms)</label>
-                        <hr />
-                        <button type="button" onclick="sendSpats();">Send SPATs (Real Time)</button>
-                        <button type="button" onclick="stopSendingSpats();">Stop Sending Spats</button>
-                    </div>
-                    <hr />
-                    <div id="bsmControls">
-                        
-                        <h3>Send Mapped BSMs</h3>
-                        <button type="buttom" onclick="sendBsmsRealTime();">Send BSMs (Real Time)</button>
-                        <button type="button" onclick="stopSendingBsms();">Stop Sending BSMs</button>
-                    </div>
-                    <div>
-                        <hr />
-                        <button type="button" onclick="sendBsms();">Send BSMs (All at once)</button>
-                    </div>
                 </div>
                 <hr />
+                <div id="spatControls">
+                    
+                    <h3>Send SPAT Template</h3>
+                    <button type="button" onclick="startSendingSpat();">Start</button>
+                    <button type="button" onclick="stopSendingSpat();">Stop</button>
+                    <br />
+                    <input type="range" min="50" max="150" value="100" step="5" name="spatInterval"
+                        id="spatInterval" oninput="this.nextElementSibling.value = this.value" />
+                    <output>100</output>
+                    <br />
+                    <label for="spatInterval">SPAT Interval (ms)</label>
+                    <hr />
+                    <h3>Send Selected SPAT Phases (Real Time)</h3>
+                    <button type="button" onclick="sendSpats();">Start</button>
+                    <button type="button" onclick="stopSendingSpats();">Stop</button>
+                </div>
+                <hr />
+                <div id="bsmControls">
+                    
+                    <h3>Send BSMs (Real Time)</h3>
+                    <button type="buttom" onclick="sendBsmsRealTime();">Start</button>
+                    <button type="button" onclick="stopSendingBsms();">Stop</button>
+                </div>
                 <div>
-                    <h2>Download</h2>
+                    <hr />
+                    <h3>Send BSMs (All at once)</h3>
+                    <button type="button" onclick="sendBsms();">Send</button>
+                </div>
+                
+                <hr />
+                <div>
+                    <h3>Download BSMs (line-delimited JSON)</h3>
                     <div>
-                        <button type="button" onclick="downloadBsms();">Download BSMs (line-delimited JSON)</button>
+                        <button type="button" onclick="downloadBsms();">Download</button>
                     </div>
                 </div>
                 <hr />
@@ -882,7 +884,8 @@
             timestamp: millis,
             msgCnt: msgCnt,
             events: events,
-            spatId: serializeSpatId(uniqueSpatId(events))
+            spatId: serializeSpatId(uniqueSpatId(events)),
+            json: json
         };
 
         //console.log(spat);
