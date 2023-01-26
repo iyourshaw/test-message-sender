@@ -69,24 +69,18 @@ h1, h2 {
 
 .selectTable th {
     font-weight: bold;
+    text-align: center;
 }
 
 .selectTable td {
-    padding: 0;
+    padding: 0px 0px 0px 3px;
 }
 
 .selectTable, .selectTable th, .selectTable td {
     border: 1px solid;
 }
 
-.selectTable table {
-    width: 100%;
-    font-size: 1em;
-}
 
-.selectTable table, .selectTable table td, .selectTable table th {
-    border: 0px none;
-}
 
 
 

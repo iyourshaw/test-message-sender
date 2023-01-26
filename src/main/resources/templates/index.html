@@ -189,6 +189,7 @@
 
     const bsmList = [];  /* Array of BSM locations */
     const spatList = [];
+
     const uniqueSpatEvents = [];
 
     const baseMaps = {
@@ -590,6 +591,8 @@
         return bsm;
     }
 
+    
+
     function addCircleMarker(bsm) {
         const latlng = L.latLng(bsm.coords[1], bsm.coords[0]);
         const options = {
@@ -763,8 +766,10 @@
                     }
                 }
 
-                //console.log("Uploaded " + spatList.length + " SPATs");
+                // Sort by ingest time
+                spatList.sort((a, b) => a.odeReceivedAt - b.odeReceivedAt);
 
+                // Find unique events
                 const eventsList = [];
                 const diffEvents = [];
                 for (const spat of spatList) {
@@ -788,10 +793,68 @@
                 }
                 
                 console.log("Found " + uniqueSpatEvents.length + " unique spat events");
+                
+                
+
+                // Group the first stream of each unique spat id with the event
+                for (const event of uniqueSpatEvents) {                   
+                    let [firstIdx, spatStream] = getFirstStream(event, 0);
+                    // If the first index is 0, find the second stream of this type
+                    // because the first one is probably cut off
+                    if (firstIdx == 0) {                      
+                        [firstIdx, spatStream] = getFirstStream(event, spatStream.length + 1)
+                    }
+                    event.firstIdx = firstIdx;
+                    const firstItem = _.head(spatStream);
+                    const lastItem = _.last(spatStream);
+                    event.firstOdeTime = firstItem.odeReceivedAt;
+                    event.lastOdeTime = lastItem.odeReceivedAt;
+                    event.firstTimestamp = firstItem.timestamp;
+                    event.lastTimestamp = lastItem.timestamp;
+                    event.odeDurationMs = event.lastOdeTime - event.firstOdeTime;
+                    event.durationMs = event.lastTimestamp - event.firstTimestamp;
+                
+                    event.stream = spatStream;
+                    
+                }
+                // Sort by start index
+                uniqueSpatEvents.sort((a, b) => a.firstIdx - b.firstIdx);
+
+                const earliestOdeTime = _.head(uniqueSpatEvents).firstOdeTime;
+                for (const event of uniqueSpatEvents) {
+                    event.firstOdeTimeOffset = event.firstOdeTime - earliestOdeTime;
+                }
+
                 console.log(uniqueSpatEvents);
                 showSpatTable(uniqueSpatEvents);
             })
         }
+    }
+
+    function getFirstStream(event, startIdx) {
+        const spatId = serializeSpatId(event);
+        console.log("spatId " + spatId);
+
+        const firstIdx = _.findIndex(spatList, function(o) {
+            return o.spatId == spatId;
+        }, startIdx);
+        console.log("First index: " + firstIdx);
+        
+        
+        let isSameId = true;
+        let idx = firstIdx;
+
+        const spatStream = [];
+        while (isSameId) {
+            const spat = spatList[idx];
+            isSameId = (spat.spatId == spatId);
+            if (isSameId) {
+                spatStream.push(spat);
+            }
+            ++idx;
+        }
+        console.log("Spat stream length: " + spatStream.length);
+        return [firstIdx, spatStream];
     }
 
     function setSpatTemplate(text) {
@@ -802,18 +865,18 @@
     function extractSpatData(json) {
         const metadata = json?.metadata;
         const dtReceivedAtMillis = Date.parse(metadata.odeReceivedAt);
+        const dt = new Date(dtReceivedAtMillis);
+        const minuteMillis = Date.UTC(dt.getUTCFullYear(), dt.getUTCMonth(), dt.getUTCDate(), dt.getUTCHours(), dt.getUTCMinutes(), 0, 0);
+       
         const payload = json.payload;
         const data = payload.data;
         const isl = data.intersectionStateList;
-
         const isl2 = isl.intersectionStatelist;
         const intersection = isl2[0];
-        const region = intersection.id?.region;
-        const revision = intersection.revision;
-        const intersectionId = intersection.id?.id;
-        const moy = intersection.moy;
-        const timestamp = intersection.timeStamp;
+        const secMark = intersection.timeStamp;
+        const millis = minuteMillis + secMark;
         const movementList = intersection.states?.movementList;
+        const msgCnt = intersection.revision;
         
         const events = [];
 
@@ -839,10 +902,14 @@
             
         }
 
-        const spat = { odeReceivedAt: dtReceivedAtMillis, 
-            region: region, intersectionId: intersectionId, 
-            moy: moy, timestamp: timestamp,
-            events: events}
+        const spat = { 
+            odeReceivedAt: dtReceivedAtMillis, 
+            timestamp: millis,
+            msgCnt: msgCnt,
+            events: events,
+            spatId: serializeSpatId(uniqueSpatId(events))
+        };
+
         //console.log(spat);
         return spat;
     }
@@ -872,21 +939,25 @@
         tbl.innerHTML = '';
         const tBody = document.createElement("tbody");
         const hr = document.createElement("tr");
-        const hd1 = document.createElement("td");
-        const hd2 = document.createElement("td");
-        const hd3 = document.createElement("td");
+        const hd1 = document.createElement("th");
+        const hd2 = document.createElement("th");
+        const hd3 = document.createElement("th");
+        const hd4 = document.createElement("th");
 
-        const hText1 = document.createTextNode("Include");
-        const hText2 = document.createTextNode("Start(ms)");
-        const hText3 = document.createTextNode("State / Signal Groups");
+        const hText1 = document.createTextNode("x");
+        const hText2 = document.createTextNode("Start (ms)");
+        const hText3 = document.createTextNode("Duration (s)");
+        const hText4 = document.createTextNode("State / Signal Groups");
 
         hd1.appendChild(hText1);
         hd2.appendChild(hText2);
         hd3.appendChild(hText3);
+        hd4.appendChild(hText4);
 
         hr.appendChild(hd1);
         hr.appendChild(hd2);
         hr.appendChild(hd3);
+        hr.appendChild(hd4);
 
         tBody.appendChild(hr);
 
@@ -903,15 +974,15 @@
             selectCell.appendChild(checkbox);
             rowGroup.appendChild(selectCell);
 
-
             const tsCell = document.createElement("td");
-            const tsText = document.createElement("input");
-            tsText.type = 'text';
-            tsText.id = 'spatTime' + idx;
-            tsText.maxlength = 6;
-            tsText.size = 6;
+            const tsText = document.createTextNode(spatId.firstOdeTimeOffset.toString());
             tsCell.appendChild(tsText);
             rowGroup.appendChild(tsCell);
+
+            const dCell = document.createElement("td");
+            const dText = document.createTextNode((Math.round(spatId.odeDurationMs/1000)).toString());
+            dCell.appendChild(dText);
+            rowGroup.appendChild(dCell);
 
             const groupCell = document.createElement("td");
             
