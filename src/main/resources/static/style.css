@@ -6,6 +6,7 @@ html, body {
 
 .h2, h3 {
     margin: 0px;
+    padding: 0px;
 }
 
 .container {
@@ -19,14 +20,17 @@ html, body {
 }
 
 .side {
-    width:20%;
+    width:15%;
     display: flex;
     flex-direction: column;
     height:100%;
 }
-
+.sideHeader {
+    padding: 5px;
+}
 .sideItem {
-    padding: 10px;
+    flex-grow: 1;
+    padding: 5px;
 }
 
 .sideItem > div {
@@ -39,11 +43,54 @@ h1, h2 {
 
 .jsonDocument {
     white-space: pre;
-    font-family: monospace;
+    font-family: sans-serif;
+    font-size: 0.8em;
     flex-grow: 1;
     overflow: scroll;
     border: 1px solid black;
 }
+
+.tableContainer {
+    border: 1px solid black;
+    font-size: 0.8em;
+    flex-grow: 1;
+    display: flex;
+    overflow: scroll;
+}
+
+.selectTable {
+    flex-grow: 1;
+    border-collapse: collapse;
+    font-size: 0.8em;
+    font-family: sans-serif;
+}
+
+
+
+.selectTable th {
+    font-weight: bold;
+}
+
+.selectTable td {
+    padding: 0;
+}
+
+.selectTable, .selectTable th, .selectTable td {
+    border: 1px solid;
+}
+
+.selectTable table {
+    width: 100%;
+    font-size: 1em;
+}
+
+.selectTable table, .selectTable table td, .selectTable table th {
+    border: 0px none;
+}
+
+
+
+
 
 
 

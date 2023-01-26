@@ -11,19 +11,31 @@
         integrity="sha256-WBkoXOwTeyKclOHuWtc+i2uENFpDZ9YPdf5Hf+D7ewM=" crossorigin=""></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet.draw/0.4.14/leaflet.draw.js"></script>
     <script src='https://unpkg.com/@turf/turf@6/turf.min.js'></script>
+    <script src=" https://cdn.jsdelivr.net/npm/lodash@4.17.21/lodash.min.js "></script>
     <title>Test Message Sender</title>
 </head>
 
 <body>
     <div class="container">
         <div class="side">
-            <h3 class="sideItem">BSM Template</h3>
-            <div class="sideItem jsonDocument" id="bsmTemplate" contenteditable="true" spellcheck="false">
-            </div>
-            <h3 class="sideItem">SPAT Template</h3>
+            <h3 class="sideHeader">SPAT Template</h3>
             <div class="sideItem jsonDocument" id="spatTemplate" contenteditable="true" spellcheck="false">
                 Spat document
             </div>
+            <h3 class="sideHeader">BSM Template</h3>
+            <div class="sideItem jsonDocument" id="bsmTemplate" contenteditable="true" spellcheck="false">
+            </div>
+            
+            
+        </div>
+        <div class="side" style="width: 20%">
+            
+            <h3 class="sideHeader">SPAT Phases</h3>
+            <div class="sideItem tableContainer" id="spatTableContainer" style="padding: 0px" >
+                <table id="spatTable" class="selectTable">
+                </table>
+            </div>
+            <div class="sideItem"></div>
         </div>
 
 
@@ -35,7 +47,6 @@
 
                 <div>
                     <h3>Upload ODE Json</h3>
-                    <p>(OdeMapData, OdeSpatData, OdeBsmData formats)</p>
                     <div>
                         <hr />
                         Upload BSMs (line-delimited JSON)
@@ -56,6 +67,7 @@
                         <hr />
                         Upload SPATs (line-delimited JSON)
                         <input type="file" accept=".jsonl,.ndjson,.csv" onchange="uploadSpats(this);" />
+                        
                     </div>
                 </div>
                 <hr />
@@ -177,6 +189,7 @@
 
     const bsmList = [];  /* Array of BSM locations */
     const spatList = [];
+    const uniqueSpatEvents = [];
 
     const baseMaps = {
         'No Base Map': empty,
@@ -356,7 +369,7 @@
         for (const key in feature.properties) {
             const val = feature.properties[key];
             // Include numbers only
-            if (typeof val != 'boolean' && !isNaN(val)) {
+            if (_.isNumber(val)) {
                 popupContent += key + ' = ' + val + '<br/>';
             }
         }
@@ -736,8 +749,9 @@
             file.text().then(text => {
                 // Clear existing spats
                 spatList.length = 0;
+                uniqueSpatEvents.length = 0;
                 const lines = text.split(/\r?\n/);
-                console.log("Read " + lines.length + " from spat file");
+                console.log("Read " + lines.length + " spats from file");
 
                 // Set the first SPAT as the template
                 setSpatTemplate(lines[0])
@@ -749,7 +763,33 @@
                     }
                 }
 
-                console.log("Uploaded " + spatList.length + " SPATs");
+                //console.log("Uploaded " + spatList.length + " SPATs");
+
+                const eventsList = [];
+                const diffEvents = [];
+                for (const spat of spatList) {
+                    eventsList.push(spat.events);
+                }
+                console.log("Events list " + eventsList.length);
+                let previousEvent = uniqueSpatId(_.head(eventsList));
+                for (const event of eventsList) {
+                    // Remove timing
+                    const strippedEvent = uniqueSpatId(event);
+                    if (!_.isEqual(strippedEvent, previousEvent)) {
+                        diffEvents.push(serializeSpatId(strippedEvent));
+                        previousEvent = strippedEvent;
+                    }
+                }
+                console.log("Found " + diffEvents.length + " diff spat events");
+
+                const uniqueEvents = _.uniq(diffEvents);
+                for (const event of uniqueEvents) {
+                    uniqueSpatEvents.push(deserializeSpatId(event));
+                }
+                
+                console.log("Found " + uniqueSpatEvents.length + " unique spat events");
+                console.log(uniqueSpatEvents);
+                showSpatTable(uniqueSpatEvents);
             })
         }
     }
@@ -765,6 +805,7 @@
         const payload = json.payload;
         const data = payload.data;
         const isl = data.intersectionStateList;
+
         const isl2 = isl.intersectionStatelist;
         const intersection = isl2[0];
         const region = intersection.id?.region;
@@ -802,10 +843,106 @@
             region: region, intersectionId: intersectionId, 
             moy: moy, timestamp: timestamp,
             events: events}
-        console.log(spat);
+        //console.log(spat);
         return spat;
     }
 
+    function uniqueSpatId(event) {
+        const spatId = new Map();
+        for (const item of event) {
+            spatId.set(item.signalGroup, item.eventState);
+        }
+        //console.log(spatId);
+        return spatId;
+    }
+
+    function serializeSpatId(id) {
+        return JSON.stringify(Array.from(id.entries()));
+    }
+
+    function deserializeSpatId(text) {
+        return new Map(JSON.parse(text));
+    }
+
+    
+    
+    function showSpatTable(spatIds) {
+        const tbl = document.getElementById("spatTable");
+        // Clear the old table
+        tbl.innerHTML = '';
+        const tBody = document.createElement("tbody");
+        const hr = document.createElement("tr");
+        const hd1 = document.createElement("td");
+        const hd2 = document.createElement("td");
+        const hd3 = document.createElement("td");
+
+        const hText1 = document.createTextNode("Include");
+        const hText2 = document.createTextNode("Start(ms)");
+        const hText3 = document.createTextNode("State / Signal Groups");
+
+        hd1.appendChild(hText1);
+        hd2.appendChild(hText2);
+        hd3.appendChild(hText3);
+
+        hr.appendChild(hd1);
+        hr.appendChild(hd2);
+        hr.appendChild(hd3);
+
+        tBody.appendChild(hr);
+
+        for (let idx = 0; idx < spatIds.length; ++idx) {
+            const spatId = spatIds[idx];
+            const groupedStates = groupByEventState(spatId);
+            const rowGroup = document.createElement("tr");
+
+            const selectCell = document.createElement("td");
+            const checkbox = document.createElement("input");
+            checkbox.type = "checkbox";
+            checkbox.id = 'spatState' + idx;
+            checkbox.checked = false;
+            selectCell.appendChild(checkbox);
+            rowGroup.appendChild(selectCell);
+
+
+            const tsCell = document.createElement("td");
+            const tsText = document.createElement("input");
+            tsText.type = 'text';
+            tsText.id = 'spatTime' + idx;
+            tsText.maxlength = 6;
+            tsText.size = 6;
+            tsCell.appendChild(tsText);
+            rowGroup.appendChild(tsCell);
+
+            const groupCell = document.createElement("td");
+            
+            for (const [eventState, signalGroups] of Object.entries(groupedStates)) {
+                const cellText1 = document.createTextNode(_.upperFirst(_.camelCase(eventState)) + ' ');
+                groupCell.appendChild(cellText1);
+                const cellText2 = document.createTextNode(JSON.stringify(signalGroups));
+                groupCell.appendChild(cellText2);
+                groupCell.appendChild(document.createElement("br"));
+            }
+            rowGroup.appendChild(groupCell);
+            tBody.appendChild(rowGroup);
+        }
+
+        tbl.appendChild(tBody);
+    }
+
+    function groupByEventState(spatId) {
+        const eventStateMap = {};
+        for (const [signalGroup, eventState] of spatId) {
+            let signalGroups;
+            if (!eventStateMap.hasOwnProperty(eventState)) {
+                signalGroups = [];
+                eventStateMap[eventState] = signalGroups;
+            } else {
+                signalGroups = eventStateMap[eventState];
+            }
+            signalGroups.push(signalGroup);
+        }
+        return eventStateMap;
+    }
 
 
 </script>
