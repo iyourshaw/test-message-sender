@@ -200,14 +200,14 @@
     const diffSpatEvents = [];
 
     const baseMaps = {
-        'No Base Map': empty,
+        'No Base Map': empty,  
         'Google Hybrid': goog,
         'Mapbox Satellite Streets': mapbox,
-        'Open Street Map (zoom <= 19)': osm.addTo(map)   // Default added to map
+        'Open Street Map (zoom <= 19)': osm,   
+        'Open Aerial Map (zoom >= 15)': oam.addTo(map),  // Show by default
     };
 
     const overlayMaps = {
-        'Open Aerial Map (zoom >= 15)': oam.addTo(map),  // Show by default
         'Draw BSM Layer': drawnItems
     };
 
