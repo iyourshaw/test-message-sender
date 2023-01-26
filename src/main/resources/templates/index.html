@@ -100,6 +100,8 @@
                     <output>100</output>
                     <br />
                     <label for="spatInterval">SPAT Interval (ms)</label>
+                </div>
+                <div id="rtSpatControls">
                     <hr />
                     <h3>Send Selected SPAT Phases (Real Time)</h3>
                     <button type="button" onclick="sendSpats();">Start</button>
@@ -651,6 +653,7 @@
 
     var odeMapTemplate;
 
+
     function odeMapJsonToGeojson(text) {
         odeMapTemplate = JSON.parse(text);
         odeMapJsonToGeojsonAsync(text).then(
@@ -684,7 +687,7 @@
     function startSendingMap() {
         MAP_SEND = true;
         document.getElementById('mapControls').style = 'background-color:lightgreen';
-        var intervalMs = document.getElementById('mapInterval').value;
+        let intervalMs = document.getElementById('mapInterval').value;
         setTimeout(function sendMapTimed() {
             if (!MAP_SEND) return;
             intervalMs = document.getElementById('mapInterval').value;
@@ -692,7 +695,7 @@
             console.log("Sending MAP, next " + intervalMs);
             sendMapAsync(odeMap).then(successCallback, failureCallback);
             setTimeout(sendMapTimed, intervalMs);
-        }, intervalMs)
+        }, intervalMs);
     }
 
     function stopSendingMap() {
@@ -991,6 +994,57 @@
             signalGroups.push(signalGroup);
         }
         return eventStateMap;
+    }
+
+    // -------------------- Send SPAT Template --------------------------
+    var SPAT_SEND = true;
+
+    function startSendingSpat() {
+        SPAT_SEND = true;
+        document.getElementById('spatControls').style = 'background-color:lightgreen';
+        let intervalMs = document.getElementById('spatInterval').value;
+        setTimeout(function sendSpatTimed() {
+            if (!SPAT_SEND) return;
+            intervalMs = document.getElementById('spatInterval').value;
+            const odeSpat = buildSpatFromTemplate(getCurrentSpatTemplate());
+            console.log("Sending SPAT, next " + intervalMs);
+            sendSpatAsync(odeSpat).then(successCallback, failureCallback);
+            setTimeout(sendSpatTimed, intervalMs);
+        }, intervalMs);
+    }
+
+    function stopSendingSpat() {
+        SPAT_SEND = false;
+        document.getElementById('spatControls').style = '';
+    }
+
+    async function sendSpatAsync(odeSpat) {
+        const response = await fetch('/kafka/topic.OdeSpatJson', {
+            method: 'POST',
+            cache: 'no-cache',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify(odeSpat)
+        });
+    }
+
+    function buildSpatFromTemplate(spatTemplate) {
+        let spatCopy = JSON.parse(JSON.stringify(spatTemplate));
+        const nowMillis = Date.now();
+        spatCopy.metadata.odeReceivedAt = new Date(nowMillis).toISOString();
+        return spatCopy;
+    }
+
+    function getCurrentSpatTemplate() {
+        let spatTemplateObj = null;
+        try {
+            let spatText = document.getElementById("spatTemplate").innerText;
+            spatTemplateObj = JSON.parse(spatText);
+        } catch {
+            // Ignore exception if no spat template
+        }
+        return spatTemplateObj;
     }
 
 
