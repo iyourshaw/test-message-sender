@@ -72,11 +72,12 @@
                 </div>
                 <hr />
                 <div>
-                    <h3>Send</h3>
+                    
 
-
+                    <hr />
                     <div id="mapControls">
-                        <hr />
+                        
+                        <h3>Send MAP</h3>
                         <button type="button" onclick="startSendingMap();">Start sending MAP</button>
                         <button type="button" onclick="stopSendingMap();">Stop sending MAP</button>
                         <br />
@@ -87,11 +88,12 @@
                         <label for="mapInterval">MAP Interval (ms)</label>
 
                     </div>
-
+                    <hr />
                     <div id="spatControls">
-                        <hr />
-                        <button type="button" onclick="startSendingSpat();">Start sending SPAT</button>
-                        <button type="button" onclick="stopSendingSpat();">Stop sending SPAT</button>
+                        
+                        <h3>Send Selected SPATs</h3>
+                        <button type="button" onclick="startSendingSpat();">Start sending SPATs</button>
+                        <button type="button" onclick="stopSendingSpat();">Stop sending SPATs</button>
                         <br />
                         <input type="range" min="50" max="150" value="100" step="5" name="spatInterval"
                             id="spatInterval" oninput="this.nextElementSibling.value = this.value" />
@@ -102,9 +104,10 @@
                         <button type="button" onclick="sendSpats();">Send SPATs (Real Time)</button>
                         <button type="button" onclick="stopSendingSpats();">Stop Sending Spats</button>
                     </div>
-
+                    <hr />
                     <div id="bsmControls">
-                        <hr />
+                        
+                        <h3>Send Mapped BSMs</h3>
                         <button type="buttom" onclick="sendBsmsRealTime();">Send BSMs (Real Time)</button>
                         <button type="button" onclick="stopSendingBsms();">Stop Sending BSMs</button>
                     </div>
@@ -190,7 +193,7 @@
     const bsmList = [];  /* Array of BSM locations */
     const spatList = [];
 
-    const uniqueSpatEvents = [];
+    const diffSpatEvents = [];
 
     const baseMaps = {
         'No Base Map': empty,
@@ -745,6 +748,7 @@
 
 
     // ------------------------- SPAT Upload --------------------------------
+
     function uploadSpats(e) {
         console.log("uploadSpats");
         if (e?.files.length > 0) {
@@ -752,7 +756,7 @@
             file.text().then(text => {
                 // Clear existing spats
                 spatList.length = 0;
-                uniqueSpatEvents.length = 0;
+                diffSpatEvents.length = 0;
                 const lines = text.split(/\r?\n/);
                 console.log("Read " + lines.length + " spats from file");
 
@@ -769,44 +773,40 @@
                 // Sort by ingest time
                 spatList.sort((a, b) => a.odeReceivedAt - b.odeReceivedAt);
 
-                // Find unique events
-                const eventsList = [];
-                const diffEvents = [];
+                // Split the spats into an array of streams with the same phase
+                 
+                // Get the first phase and start the stream of spats
+                const firstSpat = _.head(spatList);
+                const firstEvent = firstSpat.events;
+                let previousEvent = uniqueSpatId(firstEvent);
+                previousEvent.spats = [];
+                previousEvent.spats.push(firstSpat);
+                diffSpatEvents.push(previousEvent);
+
                 for (const spat of spatList) {
-                    eventsList.push(spat.events);
-                }
-                console.log("Events list " + eventsList.length);
-                let previousEvent = uniqueSpatId(_.head(eventsList));
-                for (const event of eventsList) {
+                    const event = spat.events;
                     // Remove timing
                     const strippedEvent = uniqueSpatId(event);
                     if (!_.isEqual(strippedEvent, previousEvent)) {
-                        diffEvents.push(serializeSpatId(strippedEvent));
+                        // The phase is different, create a new stream
                         previousEvent = strippedEvent;
+                        previousEvent.spats = [];
+                        previousEvent.spats.push(spat);
+                        diffSpatEvents.push(previousEvent);
+                    } else {
+                        // The phase is the same, add to the latest stream
+                        previousEvent.spats.push(spat);
                     }
                 }
-                console.log("Found " + diffEvents.length + " diff spat events");
-
-                const uniqueEvents = _.uniq(diffEvents);
-                for (const event of uniqueEvents) {
-                    uniqueSpatEvents.push(deserializeSpatId(event));
-                }
-                
-                console.log("Found " + uniqueSpatEvents.length + " unique spat events");
-                
+                console.log("Found " + diffSpatEvents.length + " diff spat events");
                 
 
                 // Group the first stream of each unique spat id with the event
-                for (const event of uniqueSpatEvents) {                   
-                    let [firstIdx, spatStream] = getFirstStream(event, 0);
-                    // If the first index is 0, find the second stream of this type
-                    // because the first one is probably cut off
-                    if (firstIdx == 0) {                      
-                        [firstIdx, spatStream] = getFirstStream(event, spatStream.length + 1)
-                    }
-                    event.firstIdx = firstIdx;
-                    const firstItem = _.head(spatStream);
-                    const lastItem = _.last(spatStream);
+                for (const event of diffSpatEvents) {                   
+                    
+
+                    const firstItem = _.head(event.spats);
+                    const lastItem = _.last(event.spats);
                     event.firstOdeTime = firstItem.odeReceivedAt;
                     event.lastOdeTime = lastItem.odeReceivedAt;
                     event.firstTimestamp = firstItem.timestamp;
@@ -814,49 +814,24 @@
                     event.odeDurationMs = event.lastOdeTime - event.firstOdeTime;
                     event.durationMs = event.lastTimestamp - event.firstTimestamp;
                 
-                    event.stream = spatStream;
+
                     
                 }
-                // Sort by start index
-                uniqueSpatEvents.sort((a, b) => a.firstIdx - b.firstIdx);
+                
 
-                const earliestOdeTime = _.head(uniqueSpatEvents).firstOdeTime;
-                for (const event of uniqueSpatEvents) {
+                const earliestOdeTime = _.head(diffSpatEvents).firstOdeTime;
+                for (const event of diffSpatEvents) {
                     event.firstOdeTimeOffset = event.firstOdeTime - earliestOdeTime;
                 }
 
-                console.log(uniqueSpatEvents);
-                showSpatTable(uniqueSpatEvents);
+                //console.log(uniqueSpatEvents);
+                showSpatTable(diffSpatEvents);
             })
         }
     }
 
-    function getFirstStream(event, startIdx) {
-        const spatId = serializeSpatId(event);
-        console.log("spatId " + spatId);
 
-        const firstIdx = _.findIndex(spatList, function(o) {
-            return o.spatId == spatId;
-        }, startIdx);
-        console.log("First index: " + firstIdx);
-        
-        
-        let isSameId = true;
-        let idx = firstIdx;
-
-        const spatStream = [];
-        while (isSameId) {
-            const spat = spatList[idx];
-            isSameId = (spat.spatId == spatId);
-            if (isSameId) {
-                spatStream.push(spat);
-            }
-            ++idx;
-        }
-        console.log("Spat stream length: " + spatStream.length);
-        return [firstIdx, spatStream];
-    }
-
+ 
     function setSpatTemplate(text) {
         const json = JSON.parse(text);
         document.getElementById("spatTemplate").innerText = JSON.stringify(json, null, 1);
@@ -945,8 +920,8 @@
         const hd4 = document.createElement("th");
 
         const hText1 = document.createTextNode("x");
-        const hText2 = document.createTextNode("Start (ms)");
-        const hText3 = document.createTextNode("Duration (s)");
+        const hText2 = document.createTextNode("Start (s)");
+        const hText3 = document.createTextNode("Δ (s)");
         const hText4 = document.createTextNode("State / Signal Groups");
 
         hd1.appendChild(hText1);
@@ -975,7 +950,7 @@
             rowGroup.appendChild(selectCell);
 
             const tsCell = document.createElement("td");
-            const tsText = document.createTextNode(spatId.firstOdeTimeOffset.toString());
+            const tsText = document.createTextNode((spatId.firstOdeTimeOffset/1000).toString());
             tsCell.appendChild(tsText);
             rowGroup.appendChild(tsCell);
 
