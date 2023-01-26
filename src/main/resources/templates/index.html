@@ -104,8 +104,8 @@
                 <div id="rtSpatControls">
                     <hr />
                     <h3>Send Selected SPAT Phases (Real Time)</h3>
-                    <button type="button" onclick="sendSpats();">Start</button>
-                    <button type="button" onclick="stopSendingSpats();">Stop</button>
+                    <button type="button" onclick="sendSpatsRealTime();">Start</button>
+                    <button type="button" onclick="stopSendingSpatsRealTime();">Stop</button>
                 </div>
                 <hr />
                 <div id="bsmControls">
@@ -618,9 +618,6 @@
         console.log("uploadBsmTemplate")
         if (e?.files.length > 0) {
             let file = e.files[0];
-            // console.log(file);
-            // let objUrl = window.URL.createObjectURL(file);
-            // console.log(objUrl);
             file.text().then(text => {
                 setBsmTemplate(text);
             });
@@ -631,7 +628,6 @@
         console.log("uploadMapGeojson");
         if (e?.files.length > 0) {
             let file = e.files[0];
-            // let objUrl = window.URL.createObjectURL(file);
             file.text().then(text => {
                 var json = JSON.parse(text);
                 console.log(json);
@@ -808,8 +804,6 @@
 
                 // Group the first stream of each unique spat id with the event
                 for (const event of diffSpatEvents) {                   
-                    
-
                     const firstItem = _.head(event.spats);
                     const lastItem = _.last(event.spats);
                     event.firstOdeTime = firstItem.odeReceivedAt;
@@ -818,9 +812,6 @@
                     event.lastTimestamp = lastItem.timestamp;
                     event.odeDurationMs = event.lastOdeTime - event.firstOdeTime;
                     event.durationMs = event.lastTimestamp - event.firstTimestamp;
-                
-
-                    
                 }
                 
 
@@ -1045,6 +1036,104 @@
             // Ignore exception if no spat template
         }
         return spatTemplateObj;
+    }
+
+    // --------------------- Send SPATs Real Time ------------------------------
+    var RT_SPAT_SEND = false;
+    function sendSpatsRealTime() {
+        if (diffSpatEvents.length < 1) {
+            console.warn("There aren't any spats to send");
+            return;
+        }
+        
+        // Determine checked SPAT phases
+        const phases = getSelectedSpatPhases();
+        console.log("Selected phases " + phases);
+        if (phases.length == 0) {
+            console.warn("No phases are selected");
+            return;
+        }
+
+        RT_SPAT_SEND = true;
+        document.getElementById('rtSpatControls').style = 'background-color:lightgreen';
+        
+        sendSpatPhasesRealTime(phases);
+       
+
+    }
+
+    function stopSendingSpatsRealTime() {
+        RT_SPAT_SEND = false;
+        document.getElementById('rtSpatControls').style = '';
+    }
+
+    function sendSpatPhasesRealTime(phases) {
+        let phaseIdx = 0;
+        let phase = phases[phaseIdx];
+        console.log("Send spat phase " + phase);
+        let event = diffSpatEvents[phase];
+        let spats = event.spats;
+
+        let nextTime = 0;
+        let idx = 0;
+        console.log("Sending SPAT in " + nextTime + " ms");
+        setTimeout(function sendSpatTimed() {
+            if (!RT_SPAT_SEND) return;
+            const spat = JSON.parse(JSON.stringify(spats[idx].json));
+            const dtCurrent = spats[idx].odeReceivedAt;
+            spat.metadata.odeReceivedAt = new Date(Date.now()).toISOString();
+            sendSpatAsync(spat).then(successCallback, failureCallback);
+            if (idx < spats.length - 1) {
+                ++idx;
+                const nextSpat = spats[idx].json;
+                const dtNext = spats[idx].odeReceivedAt;
+                nextTime = dtNext - dtCurrent;
+                console.log("Sending SPAT in " + nextTime + " ms");
+                setTimeout(sendSpatTimed, nextTime);
+            } else if (phaseIdx < phases.length - 1) {
+                // Start the next phase
+                ++phaseIdx;
+                phase = phases[phaseIdx];
+                event = diffSpatEvents[phase];
+                spats = event.spats;
+                nextTime = 100; // Default time until next phase
+                idx = 0;
+                console.log("Send spat phase " + phase);
+                console.log("Sending SPAT in " + nextTime + " ms");
+                setTimeout(sendSpatTimed, nextTime);
+            } else {
+                console.log("Completed sending SPATs");
+                stopSendingSpatsRealTime();
+            }
+        }, nextTime);
+        
+
+    }
+
+
+    // Return a list of indices of checked spat phases
+    function getSelectedSpatPhases() {
+        const tbl = document.getElementById("spatTable");
+        const tBody = tbl.getElementsByTagName("tbody")?.[0];
+        if (!tBody) {
+            log.warn("Table has no body");
+            return [];
+        }
+        const rows = tBody?.getElementsByTagName("tr");
+
+        console.info("Table rows " + rows.length);
+        
+        const phases = [];
+        // Ignore header row
+        for (let idx = 1; idx < rows.length; idx++) {
+            const row = rows[idx];
+            const cell = row.getElementsByTagName("td")[0];
+            const checkbox = cell.childNodes[0];
+            if (checkbox.checked) {
+                phases.push(idx - 1);
+            }
+        }
+        return phases;
     }
 
 
