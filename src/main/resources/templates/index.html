@@ -88,7 +88,7 @@
                     <h3>Send SPAT Template</h3>
                     <button type="button" onclick="startSendingSpat();">Start</button>
                     <button type="button" onclick="stopSendingSpat();">Stop</button>
-                    
+                    <br/>
                     
                     <input type="range" min="50" max="150" value="100" step="5" name="spatInterval"
                         id="spatInterval" oninput="this.nextElementSibling.value = this.value" />
@@ -278,13 +278,13 @@
             var originIp = bsmTemplate.metadata.originIp;
             var id = bsmTemplate.payload.data.coreData.id;
 
-            let heading = 0;
-            let speed = 0;
-            if (prevCoords != null && prevTimestamp != null) {
-                [heading, speed] = getHeadingAndSpeed(prevCoords, [lon, lat], prevTimestamp, ts);
-                heading = Math.round(heading * 10) / 10;
-                speed = Math.round(speed * 100) / 100;
-            }
+            let heading = bsmTemplate.payload.data.coreData.heading;
+            let speed = bsmTemplate.payload.data.coreData.speed;
+            // if (prevCoords != null && prevTimestamp != null) {
+            //     [heading, speed] = getHeadingAndSpeed(prevCoords, [lon, lat], prevTimestamp, ts);
+            //     heading = Math.round(heading * 10) / 10;
+            //     speed = Math.round(speed * 100) / 100;
+            // }
             var bsm = { odeReceivedAt: ts, timestamp: ts, coords: [lon, lat], heading: heading, speed: speed, id: id, msgCnt: msgCnt, originIp: originIp };
 
             /* Tag the layer with the bsm timestamp so we can find it to update or delete */
