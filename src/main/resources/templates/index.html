@@ -45,31 +45,25 @@
             <div class="sideItem">
 
 
-                <div>
+                
                     
-                    <div>
-                        <hr />
-                        <h3>Upload BSMs (line-delimited JSON)</h3>
-                        <input type="file" accept=".jsonl,.ndjson,.csv,.txt" onchange="uploadBsms(this);" />
-                    </div>
-                    <!-- <div>
-                        <hr />
-                        Upload BSM template
-                        <input type="file" id="btnTemplateUpload" accept=".json" onchange="uploadBsmTemplate(this);" />
-                    </div> -->
-                    <div>
-                        <hr />
-                        <h3>Upload MAP JSON</h3>
-                        <input type="file" id="btnOdeMapJsonUpload" accept=".json,.csv,.jsonl,.ndjson"
-                            onchange="uploadOdeMapJson(this);" />
-                    </div>
-                    <div>
-                        <hr />
-                        <h3>Upload SPATs (line-delimited JSON)</h3>
-                        <input type="file" accept=".jsonl,.ndjson,.csv" onchange="uploadSpats(this);" />
-                        
-                    </div>
+                <div id="uploads">
+                    <hr />
+                    <h3>Upload line-delimited JSON</h3>
+                    <label for="ulBsms">BSMs</label>
+                    <input type="file" id="ulBsms" accept=".jsonl,.ndjson,.csv,.txt" onchange="uploadBsms(this);" />
+                    <br/>
+                    
+                    <label for="btnOdeMapJsonUpload">MAP</label>
+                    <input type="file" id="btnOdeMapJsonUpload" accept=".json,.csv,.jsonl,.ndjson"
+                        onchange="uploadOdeMapJson(this);" />
+                    <br/>
+                    
+                    <label for="ulSpats">SPATs</label>
+                    <input type="file" id="ulSpats" accept=".jsonl,.ndjson,.csv" onchange="uploadSpats(this);" />
+                    
                 </div>
+                
                 <hr />
                 
                     
@@ -94,7 +88,8 @@
                     <h3>Send SPAT Template</h3>
                     <button type="button" onclick="startSendingSpat();">Start</button>
                     <button type="button" onclick="stopSendingSpat();">Stop</button>
-                    <br />
+                    
+                    
                     <input type="range" min="50" max="150" value="100" step="5" name="spatInterval"
                         id="spatInterval" oninput="this.nextElementSibling.value = this.value" />
                     <output>100</output>
@@ -106,6 +101,8 @@
                     <h3>Send Selected SPAT Phases (Real Time)</h3>
                     <button type="button" onclick="sendSpatsRealTime();">Start</button>
                     <button type="button" onclick="stopSendingSpatsRealTime();">Stop</button>
+                    <label for="spatLoop">Loop</label>
+                    <input type="checkbox" id="spatLoop"/><br/>
                 </div>
                 <hr />
                 <div id="bsmControls">
@@ -113,6 +110,12 @@
                     <h3>Send BSMs (Real Time)</h3>
                     <button type="buttom" onclick="sendBsmsRealTime();">Start</button>
                     <button type="button" onclick="stopSendingBsms();">Stop</button>
+                    <label for="bsmFixedInterval">Fixed Interval</label>
+                    <input type="checkbox" id="bsmFixedInterval" checked /><br/>
+                    <input type="range" min="10" max="1000" value="100" step="10" name="bsmInterval"
+                        id="bsmInterval" oninput="this.nextElementSibling.value = this.value"/>
+                    <output>100</output><br/>
+                    <label for="bsmInterval">BSM Interval (ms)</label>
                 </div>
                 <div>
                     <hr />
@@ -122,9 +125,10 @@
                 
                 <hr />
                 <div>
-                    <h3>Download BSMs (line-delimited JSON)</h3>
+                    <h3>Download (line-delimited JSON)</h3>
                     <div>
-                        <button type="button" onclick="downloadBsms();">Download</button>
+                        <button type="button" onclick="downloadBsms();">BSMs</button>
+                        <button type="button" onclick="downloadSpats();">SPATs</button>
                     </div>
                 </div>
                 <hr />
@@ -352,6 +356,7 @@
             onEachFeature: addPropertiesTooltip
         }).addTo(map);
         layerControl.addOverlay(geojsonLayer, 'MAP Geojson');
+        map.fitBounds(geojsonLayer.getBounds());
     }
 
     function setConnectingLanesGeojson(connectingGeojson) {
@@ -406,8 +411,8 @@
         BSM_SEND = true;
         document.getElementById('bsmControls').style = 'background-color:lightgreen';
 
-        // Set the timestamps to start 500 ms from now
-        const startIn = 500;
+
+        const startIn = 0;
         const now = Date.now();
         const firstTimestamp = theBsmList[0].odeReceivedAt;
         let offset = now - firstTimestamp + startIn;
@@ -424,6 +429,8 @@
         let nextTime = startIn;
         console.log("Sending BSM in " + nextTime + " ms");
         let correctionOffset = 0;
+        const bsmFixedInterval = document.getElementById('bsmFixedInterval');
+        const bsmInterval = document.getElementById('bsmInterval');
         setTimeout(function sendBsmTimed() {
             if (!BSM_SEND) return;
             const bsm = theBsmList[idx];
@@ -432,22 +439,27 @@
             sendBsmAsync(postDataItem).then(successCallback, failureCallback);
             if (idx < theBsmList.length - 1) {
                 ++idx;
-                const nextBsm = theBsmList[idx];
-                nextTime = nextBsm.odeReceivedAt - Date.now() - correctionOffset;
+                if (bsmFixedInterval.checked) {
+                    noDelay = false;
+                    nextTime = bsmInterval.value;
+                } else {
+                    const nextBsm = theBsmList[idx];
+                    nextTime = nextBsm.odeReceivedAt - Date.now() - correctionOffset;
 
-                if (nextTime < 0) {
-                    nextTime = 0;
-                    if (nextTime < -MAX_DELAY) {
-                        correctionOffset = 0;
+                    if (nextTime < 0) {
+                        nextTime = 0;
+                        if (nextTime < -MAX_DELAY) {
+                            correctionOffset = 0;
+                        }
                     }
-                }
 
-                if (nextTime > MAX_DELAY) {
-                    correctionOffset = nextTime - MAX_DELAY;
-                    nextTime = MAX_DELAY;
-                    //offset = Date.now() - nextBsm.odeReceivedAt;
+                    if (nextTime > MAX_DELAY) {
+                        correctionOffset = nextTime - MAX_DELAY;
+                        nextTime = MAX_DELAY;
+                        //offset = Date.now() - nextBsm.odeReceivedAt;
+                    }
+                    nextTime = noDelay ? 0 : nextTime;
                 }
-                nextTime = noDelay ? 0 : nextTime;
                 console.log("Sending BSM id = " + id + " in " + nextTime + " ms");
                 setTimeout(sendBsmTimed, noDelay ? 0 : nextTime);
             } else {
@@ -1087,7 +1099,7 @@
                 ++idx;
                 const nextSpat = spats[idx].json;
                 const dtNext = spats[idx].odeReceivedAt;
-                nextTime = dtNext - dtCurrent;
+                nextTime = dtNext - dtCurrent;           
                 console.log("Sending SPAT in " + nextTime + " ms");
                 setTimeout(sendSpatTimed, nextTime);
             } else if (phaseIdx < phases.length - 1) {
@@ -1103,7 +1115,19 @@
                 setTimeout(sendSpatTimed, nextTime);
             } else {
                 console.log("Completed sending SPATs");
-                stopSendingSpatsRealTime();
+                const spatLoop = document.getElementById('spatLoop').checked;
+                if (spatLoop) {
+                    console.log("Sending SPATs again");
+                    phaseIdx = 0;
+                    idx = 0;
+                    phase = phases[phaseIdx];
+                    event = diffSpatEvents[phase];
+                    spats = event.spats;
+                    nextTime = 100;
+                    setTimeout(sendSpatTimed, nextTime);
+                } else {
+                    stopSendingSpatsRealTime();
+                }
             }
         }, nextTime);
         

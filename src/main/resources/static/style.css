@@ -4,9 +4,17 @@ html, body {
     font-family: sans-serif;
 }
 
-.h2, h3 {
+h2, h3 {
     margin: 0px;
     padding: 0px;
+}
+
+h3 {
+    font-size: 1em;
+}
+
+hr {
+    margin: 2px;
 }
 
 .container {
@@ -79,6 +87,16 @@ h1, h2 {
 .selectTable, .selectTable th, .selectTable td {
     border: 1px solid;
 }
+
+#uploads label {
+    font-weight:bold;
+    font-size:0.9em;
+}
+
+#uploads input {
+    margin: 2px;
+}
+
 
 
 
