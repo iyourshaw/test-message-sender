@@ -53,15 +53,18 @@
                     <label for="ulBsms">BSMs</label>
                     <input type="file" id="ulBsms" accept=".jsonl,.ndjson,.csv,.txt" onchange="uploadBsms(this);" />
                     <br/>
-                    
-                    <label for="btnOdeMapJsonUpload">MAP</label>
-                    <input type="file" id="btnOdeMapJsonUpload" accept=".json,.csv,.jsonl,.ndjson"
-                        onchange="uploadOdeMapJson(this);" />
-                    <br/>
-                    
                     <label for="ulSpats">SPATs</label>
                     <input type="file" id="ulSpats" accept=".jsonl,.ndjson,.csv" onchange="uploadSpats(this);" />
                     
+                    <h3>Upload JSON Template</h3>
+                    <label for="btnOdeMapJsonUpload">MAP</label>
+                    <input type="file" id="btnOdeMapJsonUpload" accept=".json,.csv"
+                        onchange="uploadOdeMapJson(this);" />
+                    <br/>
+                    <label for="btnOdeSpatJsonUpload">SPAT</label>
+                    <input type="file" id="btnOdeSpatJsonUpload" accept=".json,.csv"
+                        onchange="uploadOdeSpatJson(this);" />
+                    <br/>
                 </div>
                 
                 <hr />
@@ -125,12 +128,26 @@
                 
                 <hr />
                 <div>
-                    <h3>Download (line-delimited JSON)</h3>
+                    <h3>Download line-delimited JSON</h3>
                     <div>
                         <button type="button" onclick="downloadBsms();">BSMs</button>
                         <button type="button" onclick="downloadSpats();">SPATs</button>
                     </div>
+                    <h3>Download Edited Template JSON</h3>
+                    <div>
+                        <button type="button" onclick="downloadBsmTemplate();">BSM</button>
+                        <button type="button" onclick="downloadSpatTemplate();">SPAT</button>
+                    </div>
                 </div>
+                <hr/>
+                <div id="scriptControls">
+                    <h3>Script</h3>
+                    <button type="button" onclick="clearScript();">Clear</button>
+                    <button type="button" onclick="startRecording();">Start Recording</button>
+                    <button type="button" onclick="stopRecording();">Stop Recording</button>
+                    <button type="button" onclick="downloadScript();">Download</button>
+                </div>
+
                 <hr />
             </div>
 
@@ -202,6 +219,8 @@
     const spatList = [];
 
     const diffSpatEvents = [];
+
+    const script = [];
 
     const baseMaps = {
         'No Base Map': empty,  
@@ -500,6 +519,10 @@
     }
 
     async function sendBsmAsync(postDataItem) {
+        if (RECORD_SCRIPT) {
+            const strBsm = JSON.stringify(postDataItem);
+            script.push("BSM," + Date.now() + "," + strBsm);
+        }
         const response = await fetch('/kafka/topic.OdeBsmJson', {
             method: 'POST',
             cache: 'no-cache',
@@ -708,6 +731,10 @@
     }
 
     async function sendMapAsync(odeMap) {
+        if (RECORD_SCRIPT) {
+            const strMap = JSON.stringify(odeMap);
+            script.push("MAP," + Date.now() + "," + strMap);
+        }
         const response = await fetch('/kafka/topic.OdeMapJson', {
             method: 'POST',
             cache: 'no-cache',
@@ -715,7 +742,7 @@
                 'Content-Type': 'application/json'
             },
             body: JSON.stringify(odeMap)
-        })
+        });
     }
 
     function buildMapFromTemplate() {
@@ -753,6 +780,31 @@
             ldjson += JSON.stringify(postDataItem) + '\n';
         }
         downloadText('BSMData.jsonl', ldjson);
+    }
+
+    function downloadSpats() {
+        let ldjson = '';
+        const phases = getSelectedSpatPhases();
+        for (const phase of phases) {
+            const event = diffSpatEvents[phase];
+            const spats = event.spats;
+            for (const spat of spats) {
+                ldjson += JSON.stringify(spat.json) + '\n';
+            }
+        } 
+        downloadText('SPATData.jsonl', ldjson);
+    }
+
+    function downloadBsmTemplate() {
+        const bsmTemplate = getCurrentBsmTemplate();
+        const bsmStr = JSON.stringify(bsmTemplate);
+        downloadText('BSMTemplate.json', bsmStr);
+    }
+
+    function downloadSpatTemplate() {
+        const spatTemplate = getCurrentSpatTemplate();
+        const spatStr = JSON.stringify(spatTemplate);
+        downloadText('SPATTemplate.json', spatStr);
     }
 
 
@@ -1018,6 +1070,10 @@
     }
 
     async function sendSpatAsync(odeSpat) {
+        if (RECORD_SCRIPT) {
+            const strSpat = JSON.stringify(odeSpat);
+            script.push("SPAT," + Date.now() + "," + strSpat);
+        }
         const response = await fetch('/kafka/topic.OdeSpatJson', {
             method: 'POST',
             cache: 'no-cache',
@@ -1066,9 +1122,9 @@
         document.getElementById('rtSpatControls').style = 'background-color:lightgreen';
         
         sendSpatPhasesRealTime(phases);
-       
 
     }
+
 
     function stopSendingSpatsRealTime() {
         RT_SPAT_SEND = false;
@@ -1155,6 +1211,34 @@
         }
         return phases;
     }
+
+
+    // ------------------------------------ Script ------------------------------
+    var RECORD_SCRIPT = false;
+
+    function clearScript() {
+        script.length = 0;
+    }
+
+    function startRecording() {
+        RECORD_SCRIPT = true;
+        scriptControls = document.getElementById('scriptControls').style = 'background-color:lightgreen';
+    }
+
+    function stopRecording() {
+        RECORD_SCRIPT = false;
+        scriptControls = document.getElementById('scriptControls').style = '';
+    }
+
+    function downloadScript() {
+        let lines = '';
+        for (const line of script) {
+            lines += line + '\n';
+        }
+        downloadText('script.csv', lines);
+    }
+
+
 
 
 </script>
