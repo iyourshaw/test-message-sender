@@ -62,7 +62,7 @@
                         onchange="uploadOdeMapJson(this);" />
                     <br/>
                     <label for="btnOdeSpatJsonUpload">SPAT</label>
-                    <input type="file" id="btnOdeSpatJsonUpload" accept=".json,.csv"
+                    <input type="file" id="btnOdeSpatJsonUpload" accept=".json"
                         onchange="uploadOdeSpatJson(this);" />
                     <br/>
                 </div>
@@ -675,6 +675,16 @@
             console.log("MAP JSON File:");
             console.log(file);
             file.text().then(text => odeMapJsonToGeojson(text));
+        }
+    }
+
+    function uploadOdeSpatJson(e) {
+        console.log("uploadOdeSpatJson");
+        if (e?.files.length > 0) {
+            let file = e.files[0];
+            console.log("SPAT JSON File:");
+            console.log(file);
+            file.text().then(text => setSpatTemplate(text));
         }
     }
 
