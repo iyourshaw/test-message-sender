@@ -1,5 +1,7 @@
 package us.dot.its.jpo.ode.messagesender;
 
+import java.util.Scanner;
+
 import org.apache.commons.lang3.exception.ExceptionUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -37,7 +39,7 @@ public class TestController {
             var processedMap = processor.transform(null, rawMap).value;
             return ResponseEntity.status(HttpStatus.OK).contentType(MediaType.APPLICATION_JSON).body(processedMap.toString());
         } catch (Exception e) {
-            return ResponseEntity.status(HttpStatus.OK).contentType(MediaType.TEXT_PLAIN)
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST).contentType(MediaType.TEXT_PLAIN)
                 .body(ExceptionUtils.getStackTrace(e));
         }
     }
@@ -47,6 +49,9 @@ public class TestController {
     @Autowired
     KafkaTemplate<String, String> template;
 
+    @Autowired
+    ScriptRunner scriptRunner;
+
     @PostMapping(value = "/kafka/{topic}", consumes = "*/*", produces = "*/*")
     public @ResponseBody ResponseEntity<String> kafka(@RequestBody String message, @PathVariable String topic) {
         try {
@@ -55,10 +60,24 @@ public class TestController {
             String strResult = sendResult.toString();
             return ResponseEntity.status(HttpStatus.OK).contentType(MediaType.TEXT_PLAIN).body(strResult);
         } catch (Exception e) {
-            return ResponseEntity.status(HttpStatus.OK).contentType(MediaType.TEXT_PLAIN)
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST).contentType(MediaType.TEXT_PLAIN)
                     .body(ExceptionUtils.getStackTrace(e));
         }
 
+    }
+
+    
+
+    @PostMapping(value = "/script", consumes = "*/*", produces = "*/*")
+    public @ResponseBody ResponseEntity<String> runScript(@RequestBody String script) {
+        logger.info("runScript");
+        try (var scanner = new Scanner(script)) {
+            scriptRunner.scheduleScript(script);
+            return ResponseEntity.status(HttpStatus.OK).contentType(MediaType.TEXT_PLAIN).body("running script");
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST).contentType(MediaType.TEXT_PLAIN)
+                    .body(ExceptionUtils.getStackTrace(e));
+        }
     }
 
    

@@ -521,7 +521,8 @@
     async function sendBsmAsync(postDataItem) {
         if (RECORD_SCRIPT) {
             const strBsm = JSON.stringify(postDataItem);
-            script.push("BSM," + Date.now() + "," + strBsm);
+            const time = Date.now() - RECORD_START_TIME;
+            script.push("BSM," + time + "," + strBsm);
         }
         const response = await fetch('/kafka/topic.OdeBsmJson', {
             method: 'POST',
@@ -743,7 +744,8 @@
     async function sendMapAsync(odeMap) {
         if (RECORD_SCRIPT) {
             const strMap = JSON.stringify(odeMap);
-            script.push("MAP," + Date.now() + "," + strMap);
+            const time = Date.now() - RECORD_START_TIME;
+            script.push("MAP," + time + "," + strMap);
         }
         const response = await fetch('/kafka/topic.OdeMapJson', {
             method: 'POST',
@@ -1082,7 +1084,8 @@
     async function sendSpatAsync(odeSpat) {
         if (RECORD_SCRIPT) {
             const strSpat = JSON.stringify(odeSpat);
-            script.push("SPAT," + Date.now() + "," + strSpat);
+            const time = Date.now() - RECORD_START_TIME;
+            script.push("SPAT," + time + "," + strSpat);
         }
         const response = await fetch('/kafka/topic.OdeSpatJson', {
             method: 'POST',
@@ -1225,14 +1228,17 @@
 
     // ------------------------------------ Script ------------------------------
     var RECORD_SCRIPT = false;
+    var RECORD_START_TIME = 0;
 
     function clearScript() {
         script.length = 0;
+        RECORD_START_TIME = 0;
     }
 
     function startRecording() {
         RECORD_SCRIPT = true;
         scriptControls = document.getElementById('scriptControls').style = 'background-color:lightgreen';
+        RECORD_START_TIME = Date.now();
     }
 
     function stopRecording() {

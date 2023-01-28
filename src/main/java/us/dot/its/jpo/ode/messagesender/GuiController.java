@@ -12,7 +12,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 @RequestMapping("/")
 public class GuiController {
     
-    Logger logger = LoggerFactory.getLogger(GuiController.class);
+    final static Logger logger = LoggerFactory.getLogger(GuiController.class);
 
     
     @Autowired TestMessageSenderConfiguration config;
