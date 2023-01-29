@@ -1,4 +1,4 @@
-package us.dot.its.jpo.ode.messagesender;
+package us.dot.its.jpo.ode.messagesender.scriptrunner;
 
 
 import org.slf4j.Logger;
@@ -18,6 +18,8 @@ public class SendMessageJob implements Runnable {
     String messageType;
     long sendTime;
     String message;
+
+    
 
 
     @Override
