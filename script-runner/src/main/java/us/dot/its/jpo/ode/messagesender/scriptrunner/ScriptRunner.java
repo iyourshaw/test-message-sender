@@ -2,12 +2,15 @@ package us.dot.its.jpo.ode.messagesender.scriptrunner;
 
 import java.io.File;
 import java.io.FileNotFoundException;
+import java.time.Duration;
 import java.time.Instant;
+import java.time.ZoneOffset;
+import java.time.ZonedDateTime;
+import java.time.format.DateTimeFormatter;
 import java.util.Scanner;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
-import javax.annotation.PreDestroy;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -76,9 +79,33 @@ public class ScriptRunner {
         job.setKafkaTemplate(kafkaTemplate);
         job.setMessageType(messageType);
         job.setSendTime(sendTime);
-        job.setMessage(message);
+        job.setMessage(fillTimestamps(sendInstant, message));
         scheduler.schedule(job, sendInstant);
         logger.info("Scheduled {} job at {}", messageType, sendTime);
+    }
+
+    public static final String ISO_DATE_TIME = "@ISO_DATE_TIME@";
+    public static final String MINUTE_OF_YEAR = "\"@MINUTE_OF_YEAR@\"";
+    public static final String MILLI_OF_MINUTE = "\"@MILLI_OF_MINUTE@\"";
+
+    public static String fillTimestamps(Instant sendInstant, String message) {
+        ZonedDateTime zdt = sendInstant.atZone(ZoneOffset.UTC);
+        String isoDateTime = zdt.format(DateTimeFormatter.ISO_DATE_TIME);
+
+        ZonedDateTime zdtYear = ZonedDateTime.of(zdt.getYear(), 1, 1, 0, 0, 0, 0, ZoneOffset.UTC);
+        Duration moyDuration = Duration.between(zdtYear, zdt);
+        long minuteOfYear = moyDuration.toMinutes();
+
+        ZonedDateTime zdtMinute = ZonedDateTime.of(zdt.getYear(), zdt.getMonthValue(), 
+            zdt.getDayOfMonth(), zdt.getHour(), zdt.getMinute(), 0, 0, ZoneOffset.UTC);
+        Duration minDuration = Duration.between(zdtMinute, zdt);
+        long milliOfMinute = minDuration.toMillis();
+        
+        return message
+            .replace(ISO_DATE_TIME, isoDateTime)
+            .replace(MINUTE_OF_YEAR, Long.toString(minuteOfYear))
+            .replace(MILLI_OF_MINUTE, Long.toString(milliOfMinute));
+
     }
 
     

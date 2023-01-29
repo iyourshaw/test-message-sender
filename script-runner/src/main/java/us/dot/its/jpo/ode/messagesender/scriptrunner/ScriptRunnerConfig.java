@@ -10,7 +10,7 @@ import org.springframework.scheduling.concurrent.ThreadPoolTaskScheduler;
 public class ScriptRunnerConfig  {
 
 
-    @Bean
+    @Bean(destroyMethod = "shutdown")
     public ThreadPoolTaskScheduler threadPoolTaskScheduler() {
         var builder = new TaskSchedulerBuilder();
         return builder

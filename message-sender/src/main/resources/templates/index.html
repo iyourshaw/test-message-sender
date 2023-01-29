@@ -520,9 +520,7 @@
 
     async function sendBsmAsync(postDataItem) {
         if (RECORD_SCRIPT) {
-            const strBsm = JSON.stringify(postDataItem);
-            const time = Date.now() - RECORD_START_TIME;
-            script.push("BSM," + time + "," + strBsm);
+            script.push(buildScriptFromBsm(postDataItem));
         }
         const response = await fetch('/kafka/topic.OdeBsmJson', {
             method: 'POST',
@@ -743,9 +741,7 @@
 
     async function sendMapAsync(odeMap) {
         if (RECORD_SCRIPT) {
-            const strMap = JSON.stringify(odeMap);
-            const time = Date.now() - RECORD_START_TIME;
-            script.push("MAP," + time + "," + strMap);
+            script.push(buildScriptFromMap(odeMap));
         }
         const response = await fetch('/kafka/topic.OdeMapJson', {
             method: 'POST',
@@ -763,6 +759,8 @@
         mapCopy.metadata.odeReceivedAt = new Date(nowMillis).toISOString();
         return mapCopy;
     }
+
+    
 
     function getHeadingAndSpeed(coords1, coords2, millis1, millis2) {
         var point1 = turf.point(coords1);
@@ -1083,9 +1081,7 @@
 
     async function sendSpatAsync(odeSpat) {
         if (RECORD_SCRIPT) {
-            const strSpat = JSON.stringify(odeSpat);
-            const time = Date.now() - RECORD_START_TIME;
-            script.push("SPAT," + time + "," + strSpat);
+            script.push(buildScriptFromSpat(odeSpat));
         }
         const response = await fetch('/kafka/topic.OdeSpatJson', {
             method: 'POST',
@@ -1100,7 +1096,22 @@
     function buildSpatFromTemplate(spatTemplate) {
         let spatCopy = JSON.parse(JSON.stringify(spatTemplate));
         const nowMillis = Date.now();
+        const dt = new Date(nowMillis);
+        const dtMillis = dt.getTime();
+        const dtMinute = new Date(dt.getFullYear(), dt.getMonth(), dt.getDate(), dt.getHours(), dt.getMinutes(), 0, 0);
+        const minuteMillis = dtMinute.getTime();
+        const millisOfMinute = dtMillis - minuteMillis;
         spatCopy.metadata.odeReceivedAt = new Date(nowMillis).toISOString();
+        const dtYear = new Date(dt.getFullYear(), 0, 1, 0, 0, 0, 0);
+        const yearMillis = dtYear.getTime();
+        const secondOfYear = (dtMillis - yearMillis) / 1000;
+        const minuteOfYear = secondOfYear / 60;
+        spatCopy.payload.data.timeStamp = minuteOfYear;
+        for (const intersection of spatCopy.payload.data.intersectionStateList.intersectionStatelist) {
+            intersection.moy = Math.floor(minuteOfYear);
+            intersection.timeStamp = millisOfMinute;
+        }
+        
         return spatCopy;
     }
 
@@ -1253,6 +1264,44 @@
         }
         downloadText('script.csv', lines);
     }
+
+    const ISO_DATE_TIME = '@ISO_DATE_TIME@';
+    const MINUTE_OF_YEAR = '@MINUTE_OF_YEAR@';
+    const MILLI_OF_MINUTE = '@MILLI_OF_MINUTE@';
+
+    function buildScriptFromMap(odeMap) {
+        const scriptMap = JSON.parse(JSON.stringify(odeMap))
+        scriptMap.metadata.odeReceivedAt = ISO_DATE_TIME;
+        const strMap = JSON.stringify(scriptMap);
+        const time = Date.now() - RECORD_START_TIME;
+        const scriptLine = "MAP," + time + "," + strMap;
+        return scriptLine;
+    }
+
+    function buildScriptFromSpat(odeSpat) {
+        const scriptSpat = JSON.parse(JSON.stringify(odeSpat))
+        scriptSpat.metadata.odeReceivedAt = ISO_DATE_TIME;
+        scriptSpat.payload.data.timeStamp = MINUTE_OF_YEAR;
+        for (const intersection of scriptSpat.payload.data.intersectionStateList.intersectionStatelist) {
+            intersection.moy = MINUTE_OF_YEAR;
+            intersection.timeStamp = MILLI_OF_MINUTE;
+        }
+        const strSpat = JSON.stringify(scriptSpat);
+        const time = Date.now() - RECORD_START_TIME;
+        const scriptLine = "SPAT," + time + "," + strSpat;
+        return scriptLine;
+    }
+
+    function buildScriptFromBsm(odeBsm) {
+        const scriptBsm = JSON.parse(JSON.stringify(odeBsm))
+        scriptBsm.metadata.odeReceivedAt = ISO_DATE_TIME;
+        scriptBsm.payload.data.coreData.secMark = MILLI_OF_MINUTE;
+        const strBsm = JSON.stringify(scriptBsm);
+        const time = Date.now() - RECORD_START_TIME;
+        const scriptLine = "BSM," + time + "," + strBsm;
+        return scriptLine;
+    }
+
 
 
 
