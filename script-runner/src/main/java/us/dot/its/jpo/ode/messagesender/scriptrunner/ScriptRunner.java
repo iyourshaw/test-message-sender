@@ -63,6 +63,7 @@ public class ScriptRunner {
             Matcher m = linePattern.matcher(line);
             if (!m.find()) {
                 logger.warn("Skipping invalid line: \n{}", line);
+                continue;
             } 
             try {
                 String messageType = m.group("messageType");
