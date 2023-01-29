@@ -146,6 +146,11 @@
                     <button type="button" onclick="startRecording();">Start Recording</button>
                     <button type="button" onclick="stopRecording();">Stop Recording</button>
                     <button type="button" onclick="downloadScript();">Download</button>
+                    
+                    <button type="button" onclick="runScript();">Run</button>
+                    <br/>
+                    <label for="ulScript">Upload</label>
+                    <input type="file" id="ulScript" accept=".csv,.txt" onchange="uploadScript(this);" />
                 </div>
 
                 <hr />
@@ -1263,6 +1268,50 @@
             lines += line + '\n';
         }
         downloadText('script.csv', lines);
+    }
+
+    function runScript() {
+        console.log("Run script");
+        if (script.length == 0) {
+            console.warn("No script to run");
+            return;
+        }
+        if (RECORD_SCRIPT) {
+            console.warn("Stop recording to run");
+            return;
+        }
+        console.log("Running script");
+        let lines = '';
+        for (const line of script) {
+            lines += line + '\n';
+        }
+        runScriptAsync(lines).then(successCallback, failureCallback);
+    }
+
+    function uploadScript(e) {
+        console.log("upload Script");
+        if (e?.files.length > 0) {
+            let file = e.files[0];
+            console.log("Script file:");
+            console.log(file);
+            file.text().then(text => {
+                RECORD_SCRIPT = false;
+                script.length = 0;
+                const lines = text.split(/\r?\n/);
+                script.push(...lines);
+            });
+        }
+    }
+    
+    async function runScriptAsync(lines) {
+        const response = await fetch('/script', {
+            method: 'POST',
+            cache: 'no-cache',
+            headers: {
+                'Content-Type': 'text/plain'
+            },
+            body: lines
+        });
     }
 
     const ISO_DATE_TIME = '@ISO_DATE_TIME@';

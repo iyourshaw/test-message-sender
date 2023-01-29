@@ -11,7 +11,7 @@ import java.util.Scanner;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
-
+import org.apache.commons.lang3.StringUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -33,7 +33,7 @@ public class ScriptRunner {
     KafkaTemplate<String, String> kafkaTemplate;
 
     /**
-     * 
+     * Schedule each item in a script to be run
      * @param scriptFile - File containing the script
      */
     public void scheduleScript(File scriptFile) throws FileNotFoundException {
@@ -44,7 +44,7 @@ public class ScriptRunner {
 
     /**
      * Schedule each item in a script to be run
-     * @param script - Srting containing the entire script
+     * @param script - String containing the entire script
      */
     public void scheduleScript(String script) {
         try (var scanner = new Scanner(script)) {
@@ -56,6 +56,10 @@ public class ScriptRunner {
         long startTime = Instant.now().toEpochMilli();
         while (scanner.hasNextLine()) {
             String line = scanner.nextLine();
+
+            // Skip blank lines or comments
+            if (StringUtils.isBlank(line) || line.startsWith("#")) continue;
+            
             Matcher m = linePattern.matcher(line);
             if (!m.find()) {
                 logger.warn("Skipping invalid line: \n{}", line);
@@ -66,7 +70,7 @@ public class ScriptRunner {
                 String message = m.group("message");
                 scheduleMessage(startTime, messageType, timeOffset, message);
             } catch (Exception e) {
-                logger.error("Exception {}", e);
+                logger.error(String.format("Exception in line '%s'", line), e);
             }
         }
     }
@@ -88,7 +92,7 @@ public class ScriptRunner {
     public static final String MINUTE_OF_YEAR = "\"@MINUTE_OF_YEAR@\"";
     public static final String MILLI_OF_MINUTE = "\"@MILLI_OF_MINUTE@\"";
 
-    public static String fillTimestamps(Instant sendInstant, String message) {
+    private static String fillTimestamps(Instant sendInstant, String message) {
         ZonedDateTime zdt = sendInstant.atZone(ZoneOffset.UTC);
         String isoDateTime = zdt.format(DateTimeFormatter.ISO_DATE_TIME);
 
