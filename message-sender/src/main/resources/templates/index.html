@@ -284,32 +284,37 @@
             console.log('Placed point');
             console.log(layer);
 
-            var lon = layer._latlng.lng;
-            var lat = layer._latlng.lat;
+            const lon = layer._latlng.lng;
+            const lat = layer._latlng.lat;
 
             /* Save the coordinates with the current timestamp */
-            var ts = Date.now();
-            var bsm = { timestamp: ts, coords: [lon, lat], heading: 0, speed: 0 };
+            const ts = Date.now();
 
-            var prevBsm = bsmList.length > 0 ? bsmList[bsmList.length - 1] : null;
-            var prevCoords = prevBsm?.coords;
-            var prevTimestamp = prevBsm?.timestamp;
-            var prevMsgCnt = prevBsm != null ? prevBsm.msgCnt : 0;
-            var msgCnt = (prevMsgCnt + 1) % 128;
+            const prevBsm = bsmList.length > 0 ? bsmList[bsmList.length - 1] : null;
+            const prevCoords = prevBsm?.coords;
+            //var prevTimestamp = prevBsm?.timestamp;
+            const prevMsgCnt = prevBsm != null ? prevBsm.msgCnt : 0;
+            const msgCnt = (prevMsgCnt + 1) % 128;
 
             // Get Origin IP and temp ID from template
             const bsmTemplate = getCurrentBsmTemplate();
-            var originIp = bsmTemplate.metadata.originIp;
-            var id = bsmTemplate.payload.data.coreData.id;
+            const originIp = bsmTemplate.metadata.originIp;
+            const id = bsmTemplate.payload.data.coreData.id;
 
             let heading = bsmTemplate.payload.data.coreData.heading;
             let speed = bsmTemplate.payload.data.coreData.speed;
-            // if (prevCoords != null && prevTimestamp != null) {
-            //     [heading, speed] = getHeadingAndSpeed(prevCoords, [lon, lat], prevTimestamp, ts);
-            //     heading = Math.round(heading * 10) / 10;
-            //     speed = Math.round(speed * 100) / 100;
-            // }
-            var bsm = { odeReceivedAt: ts, timestamp: ts, coords: [lon, lat], heading: heading, speed: speed, id: id, msgCnt: msgCnt, originIp: originIp };
+            const deltaTimestampMillis = 100;
+            if (prevCoords != null) {
+                [heading, speed] = getHeadingAndSpeed(prevCoords, [lon, lat], deltaTimestampMillis);
+                speed = Math.round(speed * 100) / 100;             
+                
+                // Since calculated heading won't be accurate when vehicle is stopped,
+                // use previous heading if speed is < 0.5 m/s
+                if (speed < 0.5) { 
+                    heading = prevBsm.heading;
+                }
+            }
+            const bsm = { odeReceivedAt: ts, timestamp: ts, coords: [lon, lat], heading: heading, speed: speed, id: id, msgCnt: msgCnt, originIp: originIp };
 
             /* Tag the layer with the bsm timestamp so we can find it to update or delete */
             layer.bsmTimestamp = ts;
@@ -767,12 +772,12 @@
 
     
 
-    function getHeadingAndSpeed(coords1, coords2, millis1, millis2) {
+    function getHeadingAndSpeed(coords1, coords2, deltaTimestampMillis) {
         var point1 = turf.point(coords1);
         var point2 = turf.point(coords2);
-        var heading = turf.bearingToAzimuth(turf.bearing(point1, point2));
+        var heading = Math.round(turf.bearingToAzimuth(turf.bearing(point1, point2)) * 10) / 10;
         var distanceMeters = turf.distance(point1, point2, { units: 'kilometers' }) * 1000;
-        var tSeconds = (millis2 - millis1) / 1000;
+        var tSeconds = deltaTimestampMillis / 1000;
         var speed = distanceMeters / tSeconds;
         return [heading, speed];
     }
