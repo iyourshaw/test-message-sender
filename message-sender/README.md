@@ -1,6 +1,6 @@
 # Test Message Sender
 
-This is a UI that can send test BSM JSON messages to the Conflict Monitor using a map interface.
+This is a UI that can send test BSM JSON messages to the Conflict Monitor using a map interface and create test scripts to be run with script runner.
 
 ## Configuration
 
